@@ -25,32 +25,88 @@ export interface FabricOrder {
   aciklamalar: string;
 }
 
+export interface FabricSpec {
+  en: number; // Width in CM
+  gramaj: number; // Weight in GR
+}
+
+// Fabric specifications from user's data
+export const fabricSpecs: Record<string, FabricSpec> = {
+  "40/1 İNTERLOK": { en: 160, gramaj: 210 },
+  "40/1 İNTERLOK DÜZ BOYA": { en: 160, gramaj: 210 },
+  "40/1 İNTERLOK METRAJ BASKILI": { en: 160, gramaj: 210 },
+  "40/1 İNTERLOK KASAR": { en: 160, gramaj: 210 },
+  "30/1 SÜPREM": { en: 185, gramaj: 150 },
+  "30/1 SÜPREM DÜZ BOYA": { en: 185, gramaj: 150 },
+  "30/1 SÜPREM METRAJ BASKILI": { en: 185, gramaj: 150 },
+  "30/1 LYC SÜPREM": { en: 185, gramaj: 210 },
+  "30/1 LYC SÜPREM DÜZ BOYA": { en: 185, gramaj: 210 },
+  "30/1 LYC SÜPREM KASAR FDU": { en: 185, gramaj: 210 },
+  "30/1 RİBANA": { en: 175, gramaj: 210 },
+  "30/1 RİBANA DÜZ BOYA": { en: 175, gramaj: 210 },
+  "30/1 LYC RİBANA": { en: 175, gramaj: 250 },
+  "30/1 LYC RİBANA DÜZ BOYA": { en: 175, gramaj: 250 },
+  "30/1 LYC RİBANA KASAR": { en: 175, gramaj: 250 },
+  "30/1 RİBANA AĞ BİYE KASAR RENK": { en: 175, gramaj: 210 },
+  "30/1 4*2 LYC KAŞKORSE METRAJ BASKILI": { en: 110, gramaj: 330 },
+  "30/1 4*2 LYC KAŞKORSE DÜZ BOYA": { en: 110, gramaj: 330 },
+  "30/1 İNTERLOK": { en: 175, gramaj: 240 },
+  "24/1 LYC KAŞKORSE 2*2": { en: 110, gramaj: 330 },
+  "24/1 2*2 LYC KAŞKORSE DÜZ BOYA": { en: 110, gramaj: 330 },
+  "36/1 LYC SÜPREM": { en: 180, gramaj: 170 },
+  "36/1 LYC SÜPREM DÜZ BOYA": { en: 180, gramaj: 170 },
+  "36/1 LYC SÜPREM METRAJ BASKILI": { en: 180, gramaj: 170 },
+  "36/1 RİBANA": { en: 160, gramaj: 180 },
+  "36/1 RİBANA DÜZ BOYA": { en: 160, gramaj: 180 },
+  "36/1 RİBANA KASAR": { en: 160, gramaj: 180 },
+  "36/1 RİBANA METRAJ BASKILI": { en: 160, gramaj: 180 },
+  "36/1 LYC RİBANA": { en: 155, gramaj: 220 },
+  "36/1 LYC RİBANA DÜZ BOYA": { en: 155, gramaj: 220 },
+  "36/1 LYC RİBANA KASAR": { en: 155, gramaj: 220 },
+  "40/1 LYC KAŞKORSE": { en: 110, gramaj: 200 },
+  "40/1 LYC KAŞKORSE DÜZ BOYA": { en: 110, gramaj: 200 },
+  "40/1 LYC KAŞKORSE METRAJ BASKILI": { en: 110, gramaj: 200 },
+  "26/1 SÜPREM": { en: 185, gramaj: 165 },
+  "TÜP RİBANA": { en: 70, gramaj: 210 },
+  "KADİFE DÜZ BOYA": { en: 185, gramaj: 250 },
+  "JAKARLI KADİFE - MORI MODEL KALİTESİ": { en: 185, gramaj: 250 },
+  "JAKARLI KAPİTONE DÜZ BOYA": { en: 150, gramaj: 335 },
+  "PELÜŞ DÜZ BOYA -WELLSOFT": { en: 175, gramaj: 260 },
+  "PELUŞ DÜZ BOYA - ULTRASOFT KALİTE": { en: 170, gramaj: 300 },
+  "PELUŞ METRAJ BASKILI - WELLSOFT": { en: 175, gramaj: 260 },
+  "YUMUŞAK TÜL - ÇİFT KATLI": { en: 145, gramaj: 50 },
+  "İKİ İPLİK": { en: 190, gramaj: 220 },
+  "POLAR": { en: 180, gramaj: 220 },
+  "ALTUN KALİTE 5*2 40/1 LYC KAŞKORSE": { en: 135, gramaj: 200 },
+};
+
 export const fabricTypes = [
+  "26/1 SÜPREM",
+  "30/1 SÜPREM DÜZ BOYA",
   "30/1 SÜPREM METRAJ BASKILI",
-  "30/1 LYC SÜPREM KASAR FDU",
   "30/1 LYC SÜPREM DÜZ BOYA",
+  "30/1 LYC SÜPREM KASAR FDU",
   "30/1 RİBANA DÜZ BOYA",
   "30/1 LYC RİBANA DÜZ BOYA",
   "30/1 LYC RİBANA KASAR",
   "30/1 RİBANA AĞ BİYE KASAR RENK",
   "30/1 4*2 LYC KAŞKORSE METRAJ BASKILI",
   "30/1 4*2 LYC KAŞKORSE DÜZ BOYA",
-  "30/1 SÜPREM DÜZ BOYA",
   "30/1 İNTERLOK",
-  "36/1 LYC SÜPREM METRAJ BASKILI",
-  "36/1 LYC RİBANA KASAR",
-  "36/1 RİBANA KASAR",
-  "36/1 RİBANA DÜZ BOYA",
-  "36/1 LYC RİBANA DÜZ BOYA",
-  "36/1 RİBANA METRAJ BASKILI",
   "36/1 LYC SÜPREM DÜZ BOYA",
+  "36/1 LYC SÜPREM METRAJ BASKILI",
+  "36/1 RİBANA DÜZ BOYA",
+  "36/1 RİBANA KASAR",
+  "36/1 RİBANA METRAJ BASKILI",
+  "36/1 LYC RİBANA DÜZ BOYA",
+  "36/1 LYC RİBANA KASAR",
+  "40/1 İNTERLOK DÜZ BOYA",
+  "40/1 İNTERLOK METRAJ BASKILI",
+  "40/1 İNTERLOK KASAR",
   "40/1 LYC KAŞKORSE DÜZ BOYA",
   "40/1 LYC KAŞKORSE METRAJ BASKILI",
-  "40/1 İNTERLOK DÜZ BOYA",
-  "40/1 İNTERLOK METRAJ BASKI",
-  "40/1 İNTERLOK KASAR",
-  "40/1 İNTERLOK METRAJ BASKILI",
   "24/1 2*2 LYC KAŞKORSE DÜZ BOYA",
+  "TÜP RİBANA",
   "KADİFE DÜZ BOYA",
   "JAKARLI KADİFE - MORI MODEL KALİTESİ",
   "JAKARLI KAPİTONE DÜZ BOYA",
@@ -58,6 +114,9 @@ export const fabricTypes = [
   "PELUŞ DÜZ BOYA - ULTRASOFT KALİTE",
   "PELUŞ METRAJ BASKILI - WELLSOFT",
   "YUMUŞAK TÜL - ÇİFT KATLI",
+  "İKİ İPLİK",
+  "POLAR",
+  "ALTUN KALİTE 5*2 40/1 LYC KAŞKORSE",
 ];
 
 export const usageAreas = [
@@ -96,13 +155,8 @@ export const usageAreas = [
   "PAÇA UCU",
   "YAKA + KOL",
   "KAPŞON ASTAR + BİYE",
-];
-
-export const dyeTypes = [
-  "DÜZ BOYA",
-  "KASAR",
-  "METRAJ BASKILI",
-  "KASAR RENK",
+  "SALOPET ANA BEDEN",
+  "SALOPET AĞ BİYE",
 ];
 
 export const suppliers = [
@@ -115,139 +169,8 @@ export const suppliers = [
   "NEVVAN",
 ];
 
-export const fabricPrices: Record<string, Record<string, number>> = {
-  "30/1 RİBANA DÜZ BOYA": {
-    "ANA BEDEN": 138,
-    "BODY - ANA BEDEN + AĞ BİYE": 138,
-    "BODY - AĞ BİYE": 138,
-    "PNT - ANA BEDEN": 138,
-    "TULUM - BİYE": 135,
-    "HIRKA - BİYE": 137.5,
-    "BİYE": 129.5,
-    "default": 137,
-  },
-  "30/1 LYC RİBANA DÜZ BOYA": {
-    "BODY - YAKA BİYE": 148.5,
-    "PAÇA UCU": 148.5,
-    "default": 140.5,
-  },
-  "36/1 RİBANA DÜZ BOYA": {
-    "BODY - ANA BEDEN + AĞ BİYE": 138,
-    "PNT - ANA BEDEN": 138,
-    "BERE - ANA BEDEN": 138,
-    "BODY - AĞ BİYE": 138,
-    "default": 139,
-  },
-  "36/1 LYC RİBANA DÜZ BOYA": {
-    "BODY - YAKA BİYE": 149.5,
-    "default": 149.5,
-  },
-  "36/1 RİBANA METRAJ BASKILI": {
-    "ŞORT - ANA BEDEN": 161.5,
-    "SAÇ BANDI - ANA BEDEN": 161.5,
-    "PNT - ANA BEDEN": 189.5,
-    "default": 189.5,
-  },
-  "36/1 LYC SÜPREM DÜZ BOYA": {
-    "BODY - ANA BEDEN + FIRFIR + YAKA BİYE": 141.5,
-    "BODY - ANA BEDEN + YAKA +FIRFIR": 141.5,
-    "PNT - ANA BEDEN": 149,
-    "SAÇ BANDI - ANA BEDEN": 149,
-    "default": 149,
-  },
-  "36/1 LYC SÜPREM METRAJ BASKILI": {
-    "BODY - ANA BEDEN": 168,
-    "default": 168,
-  },
-  "40/1 LYC KAŞKORSE DÜZ BOYA": {
-    "ANA BEDEN + AĞ BİYE + YAKA BİYE": 156,
-    "PNT - ANA BEDEN": 184,
-    "default": 156,
-  },
-  "40/1 LYC KAŞKORSE METRAJ BASKILI": {
-    "BODY - ANA BEDEN": 176,
-    "ŞORT - ANA BEDEN": 176,
-    "default": 176,
-  },
-  "40/1 İNTERLOK DÜZ BOYA": {
-    "BODY - ANA BEDEN + BİYE": 145,
-    "BODY - ANA BEDEN + AĞ BİYE": 145,
-    "TULUM - BİYE": 145,
-    "AĞ BİYE": 148,
-    "PNT - ANA BEDEN": 159,
-    "default": 148,
-  },
-  "40/1 İNTERLOK METRAJ BASKILI": {
-    "TULUM - ANA BEDEN": 166,
-    "BERE - ANA BEDEN": 166,
-    "PNT - ANA BEDEN": 166,
-    "BODY - ANA BEDEN": 169,
-    "SAÇ BANDI - ANA BEDEN": 169,
-    "default": 169,
-  },
-  "KADİFE DÜZ BOYA": {
-    "ANA BEDEN": 138,
-    "APLİKE": 138,
-    "PNT- ANA BEDEN": 138,
-    "TULUM - ANA BEDEN": 148.35,
-    "default": 148.35,
-  },
-  "JAKARLI KADİFE - MORI MODEL KALİTESİ": {
-    "ANA BEDEN + FIRFIR": 173,
-    "PNT-ANA BEDEN": 173,
-    "default": 173,
-  },
-  "JAKARLI KAPİTONE DÜZ BOYA": {
-    "HIRKA - ANA BEDEN": 142.7,
-    "PNT - ANA BEDEN": 142.7,
-    "default": 162.4,
-  },
-  "PELÜŞ DÜZ BOYA -WELLSOFT": {
-    "HIRKA - KOL + KAPŞON + 3D KULAK": 88.75,
-    "PNT - ANA BEDEN": 88.75,
-    "default": 88.75,
-  },
-  "PELUŞ DÜZ BOYA - ULTRASOFT KALİTE": {
-    "HIRKA - ANA BEDEN + 3D KULAK": 95.55,
-    "PNT - ANA BEDEN + BEL-": 95.55,
-    "default": 95.55,
-  },
-  "PELUŞ METRAJ BASKILI - WELLSOFT": {
-    "HIRKA - ANA BEDEN": 112.5,
-    "PNT - ANA BEDEN": 112.5,
-    "default": 111,
-  },
-  "24/1 2*2 LYC KAŞKORSE DÜZ BOYA": {
-    "HIRKA - KOL UCU + ETEK UCU": 144,
-    "PAÇA UCU": 144,
-    "default": 144,
-  },
-  "30/1 4*2 LYC KAŞKORSE METRAJ BASKILI": {
-    "BODY - ANA BEDEN + AĞ BİYE + FIRFIR": 161,
-    "TAYT - ANA BEDEN": 161,
-    "default": 186,
-  },
-  "30/1 4*2 LYC KAŞKORSE DÜZ BOYA": {
-    "BODY - YAKA + AĞ BİYE": 170,
-    "PNT - ANA BEDEN": 170,
-    "default": 174.5,
-  },
-  "30/1 SÜPREM DÜZ BOYA": {
-    "HIRKA - KAPŞON ASTAR + BİYE +FERMUAR + GARAJ PAT BİYE": 128.5,
-    "BODY - APLİKE -": 127,
-    "default": 127,
-  },
-  "30/1 LYC SÜPREM DÜZ BOYA": {
-    "HIRKA - PEMBE BİYE - FIRFIR": 137.5,
-    "default": 136.5,
-  },
-};
-
-export function calculatePrice(fabricType: string, usageArea: string): number {
-  const fabricPriceMap = fabricPrices[fabricType];
-  if (!fabricPriceMap) return 0;
-  
-  return fabricPriceMap[usageArea] || fabricPriceMap["default"] || 0;
+export function getDefaultGramaj(fabricType: string): FabricSpec | null {
+  return fabricSpecs[fabricType] || null;
 }
 
 export const sampleOrders: FabricOrder[] = [
