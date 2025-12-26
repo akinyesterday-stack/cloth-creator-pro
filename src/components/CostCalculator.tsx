@@ -1,12 +1,12 @@
-import { useState, useMemo, useRef, useCallback } from "react";
+import { useState, useRef, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { SearchableCombobox } from "@/components/SearchableCombobox";
 import { fabricTypes, usageAreas, getDefaultGramaj } from "@/data/fabricData";
-import { Calculator, Plus, Trash2, FileSpreadsheet, Package, Image, Upload, X } from "lucide-react";
-import * as XLSX from "xlsx";
+import { Calculator, Plus, Trash2, FileSpreadsheet, Package, Image, Upload, X, Pencil, Check } from "lucide-react";
+import * as XLSX from "xlsx-js-style";
 
 interface FabricItem {
   id: string;
@@ -36,6 +36,10 @@ export function CostCalculator() {
   const [en, setEn] = useState<number>(0);
   const [gramaj, setGramaj] = useState<number>(0);
   const [fiyat, setFiyat] = useState<number>(0);
+
+  // Edit state
+  const [editingItemId, setEditingItemId] = useState<string | null>(null);
+  const [editForm, setEditForm] = useState<FabricItem | null>(null);
 
   // Auto-fill en and gramaj when fabric type changes
   const handleFabricChange = (value: string) => {
@@ -103,6 +107,31 @@ export function CostCalculator() {
     }
   };
 
+  // Edit handlers
+  const handleStartEdit = (item: FabricItem) => {
+    setEditingItemId(item.id);
+    setEditForm({ ...item });
+  };
+
+  const handleSaveEdit = (modelId: string) => {
+    if (!editForm) return;
+    
+    setModels(models.map(model =>
+      model.id === modelId
+        ? { ...model, items: model.items.map(item => 
+            item.id === editingItemId ? editForm : item
+          )}
+        : model
+    ));
+    setEditingItemId(null);
+    setEditForm(null);
+  };
+
+  const handleCancelEdit = () => {
+    setEditingItemId(null);
+    setEditForm(null);
+  };
+
   // Image handling
   const handleImagePaste = useCallback((e: React.ClipboardEvent) => {
     if (!activeModelId) return;
@@ -157,41 +186,66 @@ export function CostCalculator() {
 
   const handleExportExcel = async () => {
     const wb = XLSX.utils.book_new();
-    const data: any[] = [];
+    const wsData: any[][] = [];
+    
+    // Header row
+    wsData.push(["Resim", "Model Adı", "Kumaş Türü", "Kullanım Yeri", "En (CM)", "Gramaj (GR)", "Fiyat (₺)"]);
+    
+    const merges: XLSX.Range[] = [];
+    let currentRow = 1; // Start after header
     
     // Collect all data with images
     for (const model of models) {
       if (model.items.length === 0) continue;
 
-      // Add model header with image placeholder
-      data.push({
-        "Resim": model.image ? "[RESİM]" : "",
-        "Model Adı": model.modelName,
-        "Kumaş Türü": "",
-        "Kullanım Yeri": "",
-        "En (CM)": "",
-        "Gramaj (GR)": "",
-        "Fiyat (₺)": "",
+      const modelStartRow = currentRow;
+      const rowCount = model.items.length;
+      
+      // Add items for this model
+      model.items.forEach((item, index) => {
+        if (index === 0) {
+          wsData.push([
+            model.image ? "[RESİM]" : "",
+            model.modelName,
+            item.fabricType,
+            item.usageArea,
+            item.en,
+            item.gramaj,
+            item.fiyat,
+          ]);
+        } else {
+          wsData.push([
+            "",
+            "",
+            item.fabricType,
+            item.usageArea,
+            item.en,
+            item.gramaj,
+            item.fiyat,
+          ]);
+        }
+        currentRow++;
       });
       
-      // Add items
-      model.items.forEach((item) => {
-        data.push({
-          "Resim": "",
-          "Model Adı": "",
-          "Kumaş Türü": item.fabricType,
-          "Kullanım Yeri": item.usageArea,
-          "En (CM)": item.en,
-          "Gramaj (GR)": item.gramaj,
-          "Fiyat (₺)": item.fiyat,
+      // Merge cells for Resim and Model Adı if more than 1 row
+      if (rowCount > 1) {
+        // Merge Resim column (column A)
+        merges.push({
+          s: { r: modelStartRow, c: 0 },
+          e: { r: modelStartRow + rowCount - 1, c: 0 }
         });
-      });
-      
-      // Empty row between models
-      data.push({});
+        // Merge Model Adı column (column B)
+        merges.push({
+          s: { r: modelStartRow, c: 1 },
+          e: { r: modelStartRow + rowCount - 1, c: 1 }
+        });
+      }
     }
 
-    const ws = XLSX.utils.json_to_sheet(data);
+    const ws = XLSX.utils.aoa_to_sheet(wsData);
+    
+    // Apply merges
+    ws["!merges"] = merges;
     
     // Set column widths
     ws["!cols"] = [
@@ -203,6 +257,143 @@ export function CostCalculator() {
       { wch: 12 }, // Gramaj
       { wch: 12 }, // Fiyat
     ];
+
+    // Style definitions
+    const headerStyle = {
+      font: { bold: true, color: { rgb: "FFFFFF" }, sz: 12 },
+      fill: { fgColor: { rgb: "2563EB" } },
+      alignment: { horizontal: "center", vertical: "center" },
+      border: {
+        top: { style: "medium", color: { rgb: "1E40AF" } },
+        bottom: { style: "medium", color: { rgb: "1E40AF" } },
+        left: { style: "medium", color: { rgb: "1E40AF" } },
+        right: { style: "medium", color: { rgb: "1E40AF" } },
+      }
+    };
+
+    const modelCellStyle = {
+      font: { bold: true, sz: 11 },
+      fill: { fgColor: { rgb: "DBEAFE" } },
+      alignment: { horizontal: "center", vertical: "center" },
+      border: {
+        top: { style: "medium", color: { rgb: "2563EB" } },
+        bottom: { style: "medium", color: { rgb: "2563EB" } },
+        left: { style: "medium", color: { rgb: "2563EB" } },
+        right: { style: "medium", color: { rgb: "2563EB" } },
+      }
+    };
+
+    const dataCellStyle = {
+      alignment: { horizontal: "center", vertical: "center" },
+      border: {
+        top: { style: "thin", color: { rgb: "D1D5DB" } },
+        bottom: { style: "thin", color: { rgb: "D1D5DB" } },
+        left: { style: "thin", color: { rgb: "D1D5DB" } },
+        right: { style: "thin", color: { rgb: "D1D5DB" } },
+      }
+    };
+
+    const modelBorderStyle = {
+      alignment: { horizontal: "center", vertical: "center" },
+      border: {
+        top: { style: "medium", color: { rgb: "2563EB" } },
+        bottom: { style: "medium", color: { rgb: "2563EB" } },
+        left: { style: "thin", color: { rgb: "D1D5DB" } },
+        right: { style: "thin", color: { rgb: "D1D5DB" } },
+      }
+    };
+
+    // Apply styles to all cells
+    const range = XLSX.utils.decode_range(ws["!ref"] || "A1");
+    
+    for (let R = range.s.r; R <= range.e.r; R++) {
+      for (let C = range.s.c; C <= range.e.c; C++) {
+        const cellRef = XLSX.utils.encode_cell({ r: R, c: C });
+        if (!ws[cellRef]) ws[cellRef] = { v: "", t: "s" };
+        
+        if (R === 0) {
+          // Header row
+          ws[cellRef].s = headerStyle;
+        } else if (C <= 1) {
+          // Resim and Model Adı columns
+          ws[cellRef].s = modelCellStyle;
+        } else {
+          ws[cellRef].s = dataCellStyle;
+        }
+      }
+    }
+
+    // Apply thick borders around each model group
+    let rowIndex = 1;
+    for (const model of models) {
+      if (model.items.length === 0) continue;
+      
+      const rowCount = model.items.length;
+      
+      // Apply top border to first row of model
+      for (let C = 0; C <= 6; C++) {
+        const cellRef = XLSX.utils.encode_cell({ r: rowIndex, c: C });
+        if (ws[cellRef]) {
+          ws[cellRef].s = {
+            ...ws[cellRef].s,
+            border: {
+              ...ws[cellRef].s?.border,
+              top: { style: "medium", color: { rgb: "2563EB" } },
+            }
+          };
+        }
+      }
+      
+      // Apply bottom border to last row of model
+      for (let C = 0; C <= 6; C++) {
+        const cellRef = XLSX.utils.encode_cell({ r: rowIndex + rowCount - 1, c: C });
+        if (ws[cellRef]) {
+          ws[cellRef].s = {
+            ...ws[cellRef].s,
+            border: {
+              ...ws[cellRef].s?.border,
+              bottom: { style: "medium", color: { rgb: "2563EB" } },
+            }
+          };
+        }
+      }
+      
+      // Apply left border to first column
+      for (let R = rowIndex; R < rowIndex + rowCount; R++) {
+        const cellRef = XLSX.utils.encode_cell({ r: R, c: 0 });
+        if (ws[cellRef]) {
+          ws[cellRef].s = {
+            ...ws[cellRef].s,
+            border: {
+              ...ws[cellRef].s?.border,
+              left: { style: "medium", color: { rgb: "2563EB" } },
+            }
+          };
+        }
+      }
+      
+      // Apply right border to last column
+      for (let R = rowIndex; R < rowIndex + rowCount; R++) {
+        const cellRef = XLSX.utils.encode_cell({ r: R, c: 6 });
+        if (ws[cellRef]) {
+          ws[cellRef].s = {
+            ...ws[cellRef].s,
+            border: {
+              ...ws[cellRef].s?.border,
+              right: { style: "medium", color: { rgb: "2563EB" } },
+            }
+          };
+        }
+      }
+      
+      rowIndex += rowCount;
+    }
+
+    // Set row heights
+    ws["!rows"] = [];
+    for (let i = 0; i <= range.e.r; i++) {
+      ws["!rows"].push({ hpt: 25 });
+    }
     
     XLSX.utils.book_append_sheet(wb, ws, "Maliyet Listesi");
     XLSX.writeFile(wb, `maliyet_listesi_${new Date().toISOString().split('T')[0]}.xlsx`);
@@ -440,7 +631,7 @@ export function CostCalculator() {
                         <th className="text-right py-4 px-5 font-semibold text-sm text-foreground/70">En (CM)</th>
                         <th className="text-right py-4 px-5 font-semibold text-sm text-foreground/70">Gramaj (GR)</th>
                         <th className="text-right py-4 px-5 font-semibold text-sm text-foreground/70">Fiyat</th>
-                        <th className="w-14"></th>
+                        <th className="w-24"></th>
                       </tr>
                     </thead>
                     <tbody>
@@ -450,23 +641,99 @@ export function CostCalculator() {
                           className="border-t border-border/30 hover:bg-primary/5 transition-colors duration-200"
                         >
                           <td className="py-4 px-5 text-sm text-muted-foreground font-medium">{index + 1}</td>
-                          <td className="py-4 px-5 text-sm font-medium">{item.fabricType}</td>
-                          <td className="py-4 px-5 text-sm">{item.usageArea}</td>
-                          <td className="py-4 px-5 text-sm text-right font-mono">{item.en}</td>
-                          <td className="py-4 px-5 text-sm text-right font-mono">{item.gramaj}</td>
-                          <td className="py-4 px-5 text-sm text-right font-bold text-primary">
-                            ₺{item.fiyat.toFixed(2)}
-                          </td>
-                          <td className="py-4 px-3">
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => handleRemoveItem(activeModel.id, item.id)}
-                              className="h-9 w-9 text-destructive hover:text-destructive hover:bg-destructive/10 rounded-full transition-all"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </td>
+                          {editingItemId === item.id ? (
+                            <>
+                              <td className="py-2 px-2">
+                                <Input 
+                                  value={editForm?.fabricType || ""} 
+                                  onChange={(e) => setEditForm(prev => prev ? {...prev, fabricType: e.target.value} : null)}
+                                  className="h-9 text-sm"
+                                />
+                              </td>
+                              <td className="py-2 px-2">
+                                <Input 
+                                  value={editForm?.usageArea || ""} 
+                                  onChange={(e) => setEditForm(prev => prev ? {...prev, usageArea: e.target.value} : null)}
+                                  className="h-9 text-sm"
+                                />
+                              </td>
+                              <td className="py-2 px-2">
+                                <Input 
+                                  type="number"
+                                  value={editForm?.en || ""} 
+                                  onChange={(e) => setEditForm(prev => prev ? {...prev, en: Number(e.target.value)} : null)}
+                                  className="h-9 text-sm text-right w-20"
+                                />
+                              </td>
+                              <td className="py-2 px-2">
+                                <Input 
+                                  type="number"
+                                  value={editForm?.gramaj || ""} 
+                                  onChange={(e) => setEditForm(prev => prev ? {...prev, gramaj: Number(e.target.value)} : null)}
+                                  className="h-9 text-sm text-right w-20"
+                                />
+                              </td>
+                              <td className="py-2 px-2">
+                                <Input 
+                                  type="number"
+                                  step="0.01"
+                                  value={editForm?.fiyat || ""} 
+                                  onChange={(e) => setEditForm(prev => prev ? {...prev, fiyat: Number(e.target.value)} : null)}
+                                  className="h-9 text-sm text-right w-24"
+                                />
+                              </td>
+                              <td className="py-2 px-2">
+                                <div className="flex gap-1">
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={() => handleSaveEdit(activeModel.id)}
+                                    className="h-8 w-8 text-green-600 hover:text-green-700 hover:bg-green-100"
+                                  >
+                                    <Check className="h-4 w-4" />
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={handleCancelEdit}
+                                    className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                                  >
+                                    <X className="h-4 w-4" />
+                                  </Button>
+                                </div>
+                              </td>
+                            </>
+                          ) : (
+                            <>
+                              <td className="py-4 px-5 text-sm font-medium">{item.fabricType}</td>
+                              <td className="py-4 px-5 text-sm">{item.usageArea}</td>
+                              <td className="py-4 px-5 text-sm text-right font-mono">{item.en}</td>
+                              <td className="py-4 px-5 text-sm text-right font-mono">{item.gramaj}</td>
+                              <td className="py-4 px-5 text-sm text-right font-bold text-primary">
+                                ₺{item.fiyat.toFixed(2)}
+                              </td>
+                              <td className="py-4 px-3">
+                                <div className="flex gap-1">
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={() => handleStartEdit(item)}
+                                    className="h-9 w-9 text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-full transition-all"
+                                  >
+                                    <Pencil className="h-4 w-4" />
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={() => handleRemoveItem(activeModel.id, item.id)}
+                                    className="h-9 w-9 text-destructive hover:text-destructive hover:bg-destructive/10 rounded-full transition-all"
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
+                                </div>
+                              </td>
+                            </>
+                          )}
                         </tr>
                       ))}
                     </tbody>
