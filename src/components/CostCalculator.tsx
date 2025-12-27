@@ -4,9 +4,10 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { SearchableCombobox } from "@/components/SearchableCombobox";
-import { fabricTypes, usageAreas, getDefaultGramaj } from "@/data/fabricData";
-import { Calculator, Plus, Trash2, FileSpreadsheet, Package, Image, Upload, X, Pencil, Check } from "lucide-react";
-import * as XLSX from "xlsx-js-style";
+import { FabricManager } from "@/components/FabricManager";
+import { fabricTypes as defaultFabricTypes, usageAreas as defaultUsageAreas, getDefaultGramaj } from "@/data/fabricData";
+import { Calculator, Plus, Trash2, FileSpreadsheet, Package, Image, Upload, X, Pencil, Check, Settings } from "lucide-react";
+import ExcelJS from "exceljs";
 
 interface FabricItem {
   id: string;
@@ -29,6 +30,11 @@ export function CostCalculator() {
   const [currentModelName, setCurrentModelName] = useState("");
   const [activeModelId, setActiveModelId] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  
+  // Custom fabric types and usage areas
+  const [fabricTypes, setFabricTypes] = useState<string[]>(defaultFabricTypes);
+  const [usageAreas, setUsageAreas] = useState<string[]>(defaultUsageAreas);
+  const [showManager, setShowManager] = useState(false);
   
   // Form states
   const [selectedFabric, setSelectedFabric] = useState("");
@@ -185,224 +191,186 @@ export function CostCalculator() {
   };
 
   const handleExportExcel = async () => {
-    const wb = XLSX.utils.book_new();
-    const wsData: any[][] = [];
+    const workbook = new ExcelJS.Workbook();
+    workbook.creator = 'Maliyet Hesaplayıcı';
+    workbook.created = new Date();
     
-    // Header row
-    wsData.push(["Resim", "Model Adı", "Kumaş Türü", "Kullanım Yeri", "En (CM)", "Gramaj (GR)", "Fiyat (₺)"]);
-    
-    const merges: XLSX.Range[] = [];
-    let currentRow = 1; // Start after header
-    
-    // Collect all data with images
-    for (const model of models) {
-      if (model.items.length === 0) continue;
+    const worksheet = workbook.addWorksheet('Maliyet Listesi', {
+      views: [{ showGridLines: true }]
+    });
 
-      const modelStartRow = currentRow;
-      const rowCount = model.items.length;
-      
-      // Add items for this model
-      model.items.forEach((item, index) => {
-        if (index === 0) {
-          wsData.push([
-            model.image ? "[RESİM]" : "",
-            model.modelName,
-            item.fabricType,
-            item.usageArea,
-            item.en,
-            item.gramaj,
-            item.fiyat,
-          ]);
-        } else {
-          wsData.push([
-            "",
-            "",
-            item.fabricType,
-            item.usageArea,
-            item.en,
-            item.gramaj,
-            item.fiyat,
-          ]);
-        }
-        currentRow++;
-      });
-      
-      // Merge cells for Resim and Model Adı if more than 1 row
-      if (rowCount > 1) {
-        // Merge Resim column (column A)
-        merges.push({
-          s: { r: modelStartRow, c: 0 },
-          e: { r: modelStartRow + rowCount - 1, c: 0 }
-        });
-        // Merge Model Adı column (column B)
-        merges.push({
-          s: { r: modelStartRow, c: 1 },
-          e: { r: modelStartRow + rowCount - 1, c: 1 }
-        });
-      }
-    }
-
-    const ws = XLSX.utils.aoa_to_sheet(wsData);
-    
-    // Apply merges
-    ws["!merges"] = merges;
-    
-    // Set column widths
-    ws["!cols"] = [
-      { wch: 15 }, // Resim
-      { wch: 18 }, // Model Adı
-      { wch: 45 }, // Kumaş Türü
-      { wch: 35 }, // Kullanım Yeri
-      { wch: 12 }, // En
-      { wch: 12 }, // Gramaj
-      { wch: 12 }, // Fiyat
+    // Define columns
+    worksheet.columns = [
+      { header: 'Resim', key: 'resim', width: 18 },
+      { header: 'Model Adı', key: 'modelAdi', width: 20 },
+      { header: 'Kumaş Türü', key: 'kumasTuru', width: 45 },
+      { header: 'Kullanım Yeri', key: 'kullanimYeri', width: 35 },
+      { header: 'En (CM)', key: 'en', width: 12 },
+      { header: 'Gramaj (GR)', key: 'gramaj', width: 14 },
+      { header: 'Fiyat (₺)', key: 'fiyat', width: 14 },
     ];
 
-    // Style definitions
-    const headerStyle = {
-      font: { bold: true, color: { rgb: "FFFFFF" }, sz: 12 },
-      fill: { fgColor: { rgb: "2563EB" } },
-      alignment: { horizontal: "center", vertical: "center" },
-      border: {
-        top: { style: "medium", color: { rgb: "1E40AF" } },
-        bottom: { style: "medium", color: { rgb: "1E40AF" } },
-        left: { style: "medium", color: { rgb: "1E40AF" } },
-        right: { style: "medium", color: { rgb: "1E40AF" } },
-      }
-    };
+    // Style header row
+    const headerRow = worksheet.getRow(1);
+    headerRow.height = 30;
+    headerRow.eachCell((cell) => {
+      cell.fill = {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: '2563EB' }
+      };
+      cell.font = { bold: true, color: { argb: 'FFFFFF' }, size: 12 };
+      cell.alignment = { horizontal: 'center', vertical: 'middle' };
+      cell.border = {
+        top: { style: 'medium', color: { argb: '1E40AF' } },
+        bottom: { style: 'medium', color: { argb: '1E40AF' } },
+        left: { style: 'medium', color: { argb: '1E40AF' } },
+        right: { style: 'medium', color: { argb: '1E40AF' } }
+      };
+    });
 
-    const modelCellStyle = {
-      font: { bold: true, sz: 11 },
-      fill: { fgColor: { rgb: "DBEAFE" } },
-      alignment: { horizontal: "center", vertical: "center" },
-      border: {
-        top: { style: "medium", color: { rgb: "2563EB" } },
-        bottom: { style: "medium", color: { rgb: "2563EB" } },
-        left: { style: "medium", color: { rgb: "2563EB" } },
-        right: { style: "medium", color: { rgb: "2563EB" } },
-      }
-    };
+    let currentRow = 2;
 
-    const dataCellStyle = {
-      alignment: { horizontal: "center", vertical: "center" },
-      border: {
-        top: { style: "thin", color: { rgb: "D1D5DB" } },
-        bottom: { style: "thin", color: { rgb: "D1D5DB" } },
-        left: { style: "thin", color: { rgb: "D1D5DB" } },
-        right: { style: "thin", color: { rgb: "D1D5DB" } },
-      }
-    };
-
-    const modelBorderStyle = {
-      alignment: { horizontal: "center", vertical: "center" },
-      border: {
-        top: { style: "medium", color: { rgb: "2563EB" } },
-        bottom: { style: "medium", color: { rgb: "2563EB" } },
-        left: { style: "thin", color: { rgb: "D1D5DB" } },
-        right: { style: "thin", color: { rgb: "D1D5DB" } },
-      }
-    };
-
-    // Apply styles to all cells
-    const range = XLSX.utils.decode_range(ws["!ref"] || "A1");
-    
-    for (let R = range.s.r; R <= range.e.r; R++) {
-      for (let C = range.s.c; C <= range.e.c; C++) {
-        const cellRef = XLSX.utils.encode_cell({ r: R, c: C });
-        if (!ws[cellRef]) ws[cellRef] = { v: "", t: "s" };
-        
-        if (R === 0) {
-          // Header row
-          ws[cellRef].s = headerStyle;
-        } else if (C <= 1) {
-          // Resim and Model Adı columns
-          ws[cellRef].s = modelCellStyle;
-        } else {
-          ws[cellRef].s = dataCellStyle;
-        }
-      }
-    }
-
-    // Apply thick borders around each model group
-    let rowIndex = 1;
     for (const model of models) {
       if (model.items.length === 0) continue;
-      
+
+      const startRow = currentRow;
       const rowCount = model.items.length;
-      
-      // Apply top border to first row of model
-      for (let C = 0; C <= 6; C++) {
-        const cellRef = XLSX.utils.encode_cell({ r: rowIndex, c: C });
-        if (ws[cellRef]) {
-          ws[cellRef].s = {
-            ...ws[cellRef].s,
-            border: {
-              ...ws[cellRef].s?.border,
-              top: { style: "medium", color: { rgb: "2563EB" } },
-            }
+
+      // Add items
+      for (let i = 0; i < model.items.length; i++) {
+        const item = model.items[i];
+        const row = worksheet.addRow({
+          resim: '',
+          modelAdi: i === 0 ? model.modelName : '',
+          kumasTuru: item.fabricType,
+          kullanimYeri: item.usageArea,
+          en: item.en,
+          gramaj: item.gramaj,
+          fiyat: item.fiyat,
+        });
+
+        row.height = 60;
+
+        // Style all cells
+        row.eachCell((cell, colNumber) => {
+          cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+          
+          // Model columns (resim and model adı)
+          if (colNumber <= 2) {
+            cell.fill = {
+              type: 'pattern',
+              pattern: 'solid',
+              fgColor: { argb: 'DBEAFE' }
+            };
+            cell.font = { bold: true, size: 11 };
+          }
+          
+          // All cells get borders
+          cell.border = {
+            top: { style: 'thin', color: { argb: 'D1D5DB' } },
+            bottom: { style: 'thin', color: { argb: 'D1D5DB' } },
+            left: { style: 'thin', color: { argb: 'D1D5DB' } },
+            right: { style: 'thin', color: { argb: 'D1D5DB' } }
+          };
+        });
+
+        currentRow++;
+      }
+
+      // Merge cells for Resim and Model Adı
+      if (rowCount > 1) {
+        worksheet.mergeCells(startRow, 1, startRow + rowCount - 1, 1); // Resim
+        worksheet.mergeCells(startRow, 2, startRow + rowCount - 1, 2); // Model Adı
+      }
+
+      // Add image if exists
+      if (model.image) {
+        try {
+          // Extract base64 data
+          const base64Match = model.image.match(/^data:image\/(png|jpeg|jpg|gif);base64,(.+)$/);
+          if (base64Match) {
+            const extRaw = base64Match[1];
+            const base64Data = base64Match[2];
+            const extension = (extRaw === 'jpg' ? 'jpeg' : extRaw) as 'png' | 'jpeg' | 'gif';
+
+            const imageId = workbook.addImage({
+              base64: base64Data,
+              extension: extension,
+            });
+
+            worksheet.addImage(imageId, {
+              tl: { col: 0.1, row: startRow - 0.9 },
+              ext: { width: 100, height: 55 * rowCount }
+            });
+          }
+        } catch (error) {
+          console.error('Image processing error:', error);
+        }
+      }
+
+      // Apply thick borders around the entire model group
+      for (let r = startRow; r < startRow + rowCount; r++) {
+        const row = worksheet.getRow(r);
+        for (let c = 1; c <= 7; c++) {
+          const cell = row.getCell(c);
+          const existingBorder = cell.border || {};
+          
+          cell.border = {
+            top: r === startRow 
+              ? { style: 'medium', color: { argb: '2563EB' } }
+              : existingBorder.top,
+            bottom: r === startRow + rowCount - 1 
+              ? { style: 'medium', color: { argb: '2563EB' } }
+              : existingBorder.bottom,
+            left: c === 1 
+              ? { style: 'medium', color: { argb: '2563EB' } }
+              : existingBorder.left,
+            right: c === 7 
+              ? { style: 'medium', color: { argb: '2563EB' } }
+              : existingBorder.right,
           };
         }
       }
-      
-      // Apply bottom border to last row of model
-      for (let C = 0; C <= 6; C++) {
-        const cellRef = XLSX.utils.encode_cell({ r: rowIndex + rowCount - 1, c: C });
-        if (ws[cellRef]) {
-          ws[cellRef].s = {
-            ...ws[cellRef].s,
-            border: {
-              ...ws[cellRef].s?.border,
-              bottom: { style: "medium", color: { rgb: "2563EB" } },
-            }
-          };
-        }
-      }
-      
-      // Apply left border to first column
-      for (let R = rowIndex; R < rowIndex + rowCount; R++) {
-        const cellRef = XLSX.utils.encode_cell({ r: R, c: 0 });
-        if (ws[cellRef]) {
-          ws[cellRef].s = {
-            ...ws[cellRef].s,
-            border: {
-              ...ws[cellRef].s?.border,
-              left: { style: "medium", color: { rgb: "2563EB" } },
-            }
-          };
-        }
-      }
-      
-      // Apply right border to last column
-      for (let R = rowIndex; R < rowIndex + rowCount; R++) {
-        const cellRef = XLSX.utils.encode_cell({ r: R, c: 6 });
-        if (ws[cellRef]) {
-          ws[cellRef].s = {
-            ...ws[cellRef].s,
-            border: {
-              ...ws[cellRef].s?.border,
-              right: { style: "medium", color: { rgb: "2563EB" } },
-            }
-          };
-        }
-      }
-      
-      rowIndex += rowCount;
     }
 
-    // Set row heights
-    ws["!rows"] = [];
-    for (let i = 0; i <= range.e.r; i++) {
-      ws["!rows"].push({ hpt: 25 });
-    }
-    
-    XLSX.utils.book_append_sheet(wb, ws, "Maliyet Listesi");
-    XLSX.writeFile(wb, `maliyet_listesi_${new Date().toISOString().split('T')[0]}.xlsx`);
+    // Generate and download file
+    const buffer = await workbook.xlsx.writeBuffer();
+    const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `maliyet_listesi_${new Date().toISOString().split('T')[0]}.xlsx`;
+    link.click();
+    URL.revokeObjectURL(url);
   };
 
   const activeModel = models.find(m => m.id === activeModelId);
 
   return (
     <div className="space-y-8 animate-fade-in" onPaste={handleImagePaste}>
+      {/* Settings Button */}
+      <div className="flex justify-end">
+        <Button
+          variant={showManager ? "default" : "outline"}
+          onClick={() => setShowManager(!showManager)}
+          className="gap-2"
+        >
+          <Settings className="h-4 w-4" />
+          {showManager ? "Yönetimi Kapat" : "Kumaş & Kullanım Yeri Yönetimi"}
+        </Button>
+      </div>
+
+      {/* Fabric Manager */}
+      {showManager && (
+        <FabricManager
+          fabricTypes={fabricTypes}
+          usageAreas={usageAreas}
+          onFabricTypesChange={setFabricTypes}
+          onUsageAreasChange={setUsageAreas}
+        />
+      )}
+
       {/* Model Creation */}
       <Card className="border-none shadow-2xl overflow-hidden bg-gradient-to-br from-card via-card to-secondary/20">
         <CardHeader className="gradient-primary rounded-t-lg relative overflow-hidden">
