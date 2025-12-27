@@ -4,8 +4,8 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { SearchableCombobox } from "@/components/SearchableCombobox";
-import { FabricManager } from "@/components/FabricManager";
-import { fabricTypes as defaultFabricTypes, usageAreas as defaultUsageAreas, getDefaultGramaj } from "@/data/fabricData";
+import { FabricManager, FabricTypeWithSpec } from "@/components/FabricManager";
+import { fabricTypesWithSpecs as defaultFabricTypes, usageAreas as defaultUsageAreas } from "@/data/fabricData";
 import { Calculator, Plus, Trash2, FileSpreadsheet, Package, Image, Upload, X, Pencil, Check, Settings } from "lucide-react";
 import ExcelJS from "exceljs";
 
@@ -32,7 +32,7 @@ export function CostCalculator() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   
   // Custom fabric types and usage areas
-  const [fabricTypes, setFabricTypes] = useState<string[]>(defaultFabricTypes);
+  const [fabricTypes, setFabricTypes] = useState<FabricTypeWithSpec[]>(defaultFabricTypes);
   const [usageAreas, setUsageAreas] = useState<string[]>(defaultUsageAreas);
   const [showManager, setShowManager] = useState(false);
   
@@ -50,10 +50,10 @@ export function CostCalculator() {
   // Auto-fill en and gramaj when fabric type changes
   const handleFabricChange = (value: string) => {
     setSelectedFabric(value);
-    const specs = getDefaultGramaj(value);
-    if (specs) {
-      setEn(specs.en);
-      setGramaj(specs.gramaj);
+    const fabric = fabricTypes.find(f => f.name === value);
+    if (fabric) {
+      setEn(fabric.en);
+      setGramaj(fabric.gramaj);
     }
   };
 
@@ -513,7 +513,7 @@ export function CostCalculator() {
               <div className="space-y-3">
                 <Label className="text-sm font-semibold text-foreground/80">Kumaş Türü</Label>
                 <SearchableCombobox
-                  options={fabricTypes}
+                  options={fabricTypes.map(f => f.name)}
                   value={selectedFabric}
                   onValueChange={handleFabricChange}
                   placeholder="Kumaş seçin..."
