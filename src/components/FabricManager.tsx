@@ -99,15 +99,18 @@ export function FabricManager({
   // Bulk import handlers
   const handleParseBulkText = () => {
     const lines = bulkPasteText.trim().split('\n').filter(line => line.trim());
-    const items: FabricTypeWithSpec[] = lines.map(line => {
-      // Try to parse tab or comma separated values
-      const parts = line.split(/[\t,;]/).map(p => p.trim());
-      return {
-        name: parts[0] || line.trim(),
-        en: 0,
-        gramaj: 0
-      };
-    });
+    const items: FabricTypeWithSpec[] = lines
+      .map(line => {
+        // Try to parse tab or comma separated values
+        const parts = line.split(/[\t,;]/).map(p => p.trim());
+        return {
+          name: parts[0] || line.trim(),
+          en: 0,
+          gramaj: 0
+        };
+      })
+      // Filter out items with 3+ consecutive A characters (AAA, AAAA, AAAAA, etc.)
+      .filter(item => !/A{3,}/i.test(item.name));
     setParsedBulkItems(items);
   };
 
