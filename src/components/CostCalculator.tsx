@@ -5,9 +5,11 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { SearchableCombobox } from "@/components/SearchableCombobox";
 import { FabricManager, FabricTypeWithSpec } from "@/components/FabricManager";
+import { VoiceCommand, VoiceCommandData } from "@/components/VoiceCommand";
 import { fabricTypesWithSpecs as defaultFabricTypes, usageAreas as defaultUsageAreas } from "@/data/fabricData";
-import { Calculator, Plus, Trash2, FileSpreadsheet, Package, Image, Upload, X, Pencil, Check, Settings } from "lucide-react";
+import { Calculator, Plus, Trash2, FileSpreadsheet, Package, Image, Upload, X, Pencil, Check, Settings, Mic } from "lucide-react";
 import ExcelJS from "exceljs";
+import { toast } from "sonner";
 
 interface FabricItem {
   id: string;
@@ -56,6 +58,49 @@ export function CostCalculator() {
       setGramaj(fabric.gramaj);
     }
   };
+
+  // Voice command handler
+  const handleVoiceCommand = useCallback((command: VoiceCommandData) => {
+    if (!activeModelId) {
+      toast.warning("Önce bir model seçin veya oluşturun");
+      return;
+    }
+
+    // Find matching fabric type
+    if (command.fabricType) {
+      const matchedFabric = fabricTypes.find(f => 
+        f.name.toLowerCase().includes(command.fabricType!.toLowerCase()) ||
+        command.fabricType!.toLowerCase().includes(f.name.toLowerCase())
+      );
+      if (matchedFabric) {
+        setSelectedFabric(matchedFabric.name);
+        setEn(matchedFabric.en);
+        setGramaj(matchedFabric.gramaj);
+      } else {
+        setSelectedFabric(command.fabricType);
+      }
+    }
+
+    // Find matching usage area
+    if (command.usageArea) {
+      const matchedUsage = usageAreas.find(u => 
+        u.toLowerCase().includes(command.usageArea!.toLowerCase()) ||
+        command.usageArea!.toLowerCase().includes(u.toLowerCase())
+      );
+      if (matchedUsage) {
+        setSelectedUsage(matchedUsage);
+      } else {
+        setSelectedUsage(command.usageArea);
+      }
+    }
+
+    // Set price
+    if (command.price) {
+      setFiyat(command.price);
+    }
+
+    toast.success("Sesli komut uygulandı! Form alanlarını kontrol edin.");
+  }, [activeModelId, fabricTypes, usageAreas]);
 
   const handleAddModel = () => {
     if (!currentModelName.trim()) return;
@@ -349,12 +394,20 @@ export function CostCalculator() {
 
   return (
     <div className="space-y-8 animate-fade-in" onPaste={handleImagePaste}>
-      {/* Settings Button */}
-      <div className="flex justify-end">
+      {/* Top Controls */}
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        {/* Voice Command */}
+        <Card className="modern-card p-6">
+          <div className="flex items-center gap-4">
+            <VoiceCommand onCommand={handleVoiceCommand} />
+          </div>
+        </Card>
+
+        {/* Settings Button */}
         <Button
           variant={showManager ? "default" : "outline"}
           onClick={() => setShowManager(!showManager)}
-          className="gap-2"
+          className="gap-2 h-12"
         >
           <Settings className="h-4 w-4" />
           {showManager ? "Yönetimi Kapat" : "Kumaş & Kullanım Yeri Yönetimi"}

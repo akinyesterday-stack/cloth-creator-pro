@@ -184,18 +184,18 @@ export function FabricManager({
   );
 
   return (
-    <Card className="netflix-card border-none overflow-hidden animate-fade-in">
-      <CardHeader className="bg-gradient-to-r from-primary/20 via-primary/10 to-transparent border-b border-border/30 py-5">
-        <CardTitle className="text-2xl flex items-center gap-4 font-display tracking-wider">
-          <div className="p-3 bg-primary/20 rounded-lg glow-primary-sm">
+    <Card className="modern-card overflow-hidden animate-fade-in">
+      <CardHeader className="bg-gradient-to-r from-primary/10 via-primary/5 to-transparent border-b border-border/50 py-5">
+        <CardTitle className="text-xl flex items-center gap-4">
+          <div className="p-3 bg-primary/10 rounded-lg">
             <Layers className="h-6 w-6 text-primary" />
           </div>
-          <span>KUMAŞ & KULLANIM YERİ YÖNETİMİ</span>
+          <span className="font-semibold">Kumaş & Kullanım Yeri Yönetimi</span>
         </CardTitle>
       </CardHeader>
       <CardContent className="p-6">
         <Tabs defaultValue="fabrics" className="w-full">
-          <TabsList className="grid w-full grid-cols-2 mb-8 h-14 p-1 bg-secondary/50 border border-border/30 rounded-lg">
+          <TabsList className="grid w-full grid-cols-2 mb-8 h-14 p-1 bg-secondary/80 border border-border/50 rounded-lg">
             <TabsTrigger 
               value="fabrics" 
               className="h-full text-base font-semibold rounded-md data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:glow-primary-sm transition-all duration-300 flex items-center gap-3"
