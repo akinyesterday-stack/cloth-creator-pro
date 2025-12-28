@@ -2,17 +2,31 @@ import { Scissors } from "lucide-react";
 
 export function Header() {
   return (
-    <header className="gradient-primary text-primary-foreground shadow-lg">
-      <div className="container mx-auto px-4 py-6">
-        <div className="flex items-center gap-3">
-          <div className="w-12 h-12 rounded-xl bg-white/10 flex items-center justify-center backdrop-blur-sm">
-            <Scissors className="h-7 w-7" />
+    <header className="sticky top-0 z-50 w-full bg-background/95 backdrop-blur-md border-b border-border/30">
+      <div className="container mx-auto px-4">
+        <div className="flex h-20 items-center justify-between">
+          <div className="flex items-center gap-4">
+            <div className="relative">
+              <div className="absolute inset-0 bg-primary/30 blur-xl rounded-full" />
+              <div className="relative p-3 bg-gradient-to-br from-primary to-primary/80 rounded-xl glow-primary-sm">
+                <Scissors className="h-7 w-7 text-primary-foreground" />
+              </div>
+            </div>
+            <div>
+              <h1 className="text-3xl font-display tracking-widest text-gradient">
+                TEKSTİL MALİYET
+              </h1>
+              <p className="text-xs text-muted-foreground tracking-wider uppercase">
+                Profesyonel Maliyet Hesaplama
+              </p>
+            </div>
           </div>
-          <div>
-            <h1 className="text-2xl font-bold">Tekstil Sipariş Yönetimi</h1>
-            <p className="text-primary-foreground/70 text-sm">
-              Kumaş Takip & Maliyet Hesaplama Sistemi
-            </p>
+          
+          <div className="hidden md:flex items-center gap-8">
+            <div className="flex items-center gap-2 px-4 py-2 bg-secondary/50 rounded-lg border border-border/30">
+              <div className="w-2 h-2 bg-success rounded-full animate-pulse" />
+              <span className="text-sm text-muted-foreground">Sistem Aktif</span>
+            </div>
           </div>
         </div>
       </div>
