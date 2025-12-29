@@ -61,46 +61,113 @@ export function CostCalculator() {
 
   // Voice command handler
   const handleVoiceCommand = useCallback((command: VoiceCommandData) => {
-    if (!activeModelId) {
-      toast.warning("Önce bir model seçin veya oluşturun");
+    let targetModelId = activeModelId;
+    
+    // If model name is provided, find or create it
+    if (command.modelName) {
+      const existingModel = models.find(m => 
+        m.modelName.toLowerCase() === command.modelName!.toLowerCase()
+      );
+      
+      if (existingModel) {
+        targetModelId = existingModel.id;
+        setActiveModelId(existingModel.id);
+        toast.info(`"${existingModel.modelName}" modeli seçildi`);
+      } else {
+        // Create new model
+        const newModel: ModelGroup = {
+          id: Date.now().toString(),
+          modelName: command.modelName,
+          image: null,
+          items: [],
+        };
+        setModels(prev => [...prev, newModel]);
+        targetModelId = newModel.id;
+        setActiveModelId(newModel.id);
+        toast.success(`"${command.modelName}" modeli oluşturuldu`);
+      }
+    }
+    
+    if (!targetModelId) {
+      toast.warning("Önce bir model adı söyleyin. Örnek: 'Loska modeli 40/1 süprem ana beden 150 TL'");
       return;
     }
 
+    let matchedFabric = selectedFabric;
+    let matchedEn = en;
+    let matchedGramaj = gramaj;
+    let matchedUsage = selectedUsage;
+    let matchedPrice = fiyat;
+
     // Find matching fabric type
     if (command.fabricType) {
-      const matchedFabric = fabricTypes.find(f => 
+      const fabric = fabricTypes.find(f => 
         f.name.toLowerCase().includes(command.fabricType!.toLowerCase()) ||
         command.fabricType!.toLowerCase().includes(f.name.toLowerCase())
       );
-      if (matchedFabric) {
-        setSelectedFabric(matchedFabric.name);
-        setEn(matchedFabric.en);
-        setGramaj(matchedFabric.gramaj);
+      if (fabric) {
+        matchedFabric = fabric.name;
+        matchedEn = fabric.en;
+        matchedGramaj = fabric.gramaj;
+        setSelectedFabric(fabric.name);
+        setEn(fabric.en);
+        setGramaj(fabric.gramaj);
       } else {
+        matchedFabric = command.fabricType;
         setSelectedFabric(command.fabricType);
       }
     }
 
     // Find matching usage area
     if (command.usageArea) {
-      const matchedUsage = usageAreas.find(u => 
+      const usage = usageAreas.find(u => 
         u.toLowerCase().includes(command.usageArea!.toLowerCase()) ||
         command.usageArea!.toLowerCase().includes(u.toLowerCase())
       );
-      if (matchedUsage) {
-        setSelectedUsage(matchedUsage);
+      if (usage) {
+        matchedUsage = usage;
+        setSelectedUsage(usage);
       } else {
+        matchedUsage = command.usageArea;
         setSelectedUsage(command.usageArea);
       }
     }
 
     // Set price
     if (command.price) {
+      matchedPrice = command.price;
       setFiyat(command.price);
     }
 
-    toast.success("Sesli komut uygulandı! Form alanlarını kontrol edin.");
-  }, [activeModelId, fabricTypes, usageAreas]);
+    // Auto-add if command includes "ekle" and all required fields are present
+    if (command.autoAdd && matchedFabric && matchedUsage && matchedPrice > 0) {
+      const newItem: FabricItem = {
+        id: Date.now().toString(),
+        fabricType: matchedFabric,
+        usageArea: matchedUsage,
+        en: matchedEn,
+        gramaj: matchedGramaj,
+        fiyat: matchedPrice,
+      };
+
+      setModels(prev => prev.map(model => 
+        model.id === targetModelId 
+          ? { ...model, items: [...model.items, newItem] }
+          : model
+      ));
+      
+      // Reset form for next entry
+      setSelectedFabric("");
+      setSelectedUsage("");
+      setEn(0);
+      setGramaj(0);
+      setFiyat(0);
+      
+      toast.success("Kumaş başarıyla eklendi!", {
+        description: `${matchedFabric} - ${matchedUsage} - ₺${matchedPrice}`
+      });
+    }
+  }, [activeModelId, models, fabricTypes, usageAreas, selectedFabric, selectedUsage, en, gramaj, fiyat]);
 
   const handleAddModel = () => {
     if (!currentModelName.trim()) return;
