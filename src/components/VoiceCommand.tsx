@@ -8,11 +8,13 @@ interface VoiceCommandProps {
 }
 
 export interface VoiceCommandData {
+  modelName?: string;
   fabricType?: string;
   usageArea?: string;
   price?: number;
   quantity?: number;
   rawText: string;
+  autoAdd?: boolean;
 }
 
 // Extend window for SpeechRecognition
@@ -48,6 +50,18 @@ declare global {
   }
 }
 
+// Common fabric types for matching
+const FABRIC_KEYWORDS = [
+  'süprem', 'interlok', 'ribana', 'kaşkorse', 'penye', 'viskon', 'şardon',
+  'likralı', 'düz boya', 'melanj', 'çizgili', 'jakarlı', 'örme', 'dokuma'
+];
+
+// Common usage areas for matching
+const USAGE_KEYWORDS = [
+  'ana beden', 'kol', 'yaka', 'manşet', 'etek', 'biye', 'ribana', 'pat',
+  'kapüşon', 'cep', 'alt beden', 'üst beden', 'astar', 'kemer', 'paça'
+];
+
 export function VoiceCommand({ onCommand }: VoiceCommandProps) {
   const [isListening, setIsListening] = useState(false);
   const [transcript, setTranscript] = useState("");
@@ -63,57 +77,139 @@ export function VoiceCommand({ onCommand }: VoiceCommandProps) {
   const parseCommand = useCallback((text: string): VoiceCommandData => {
     const lowerText = text.toLowerCase();
     
-    // Parse fabric type patterns
-    const fabricPatterns = [
-      /(\d+\/\d+)\s*(süprem|interlok|ribana|kaşkorse|penye|viskon|şardon)/i,
-      /(süprem|interlok|ribana|kaşkorse|penye|viskon|şardon)\s*(\d+\/\d+)?/i,
+    // Parse model name - usually at the beginning like "model loska" or just "loska"
+    let modelName: string | undefined;
+    const modelPatterns = [
+      /model\s+(\w+)/i,
+      /modeli?\s+(\w+)/i,
+      /^(\w+)\s+(?:için|modeli)/i,
     ];
     
+    for (const pattern of modelPatterns) {
+      const match = lowerText.match(pattern);
+      if (match) {
+        modelName = match[1].toUpperCase();
+        break;
+      }
+    }
+    
+    // If no model keyword, try to get the first word as potential model name
+    if (!modelName) {
+      const words = lowerText.split(/\s+/);
+      // Check if first word is not a fabric or usage keyword
+      if (words.length > 0) {
+        const firstWord = words[0];
+        const isFabricKeyword = FABRIC_KEYWORDS.some(k => firstWord.includes(k));
+        const isUsageKeyword = USAGE_KEYWORDS.some(k => firstWord.includes(k));
+        const isNumber = /^\d/.test(firstWord);
+        
+        if (!isFabricKeyword && !isUsageKeyword && !isNumber && firstWord.length > 2) {
+          modelName = firstWord.toUpperCase();
+        }
+      }
+    }
+
+    // Parse fabric type patterns - more comprehensive
     let fabricType: string | undefined;
-    for (const pattern of fabricPatterns) {
-      const match = lowerText.match(pattern);
-      if (match) {
-        fabricType = match[0].toUpperCase();
+    
+    // First try numbered patterns like "40/1 süprem"
+    const numberedFabricPattern = /(\d+\/\d+)\s*(süprem|interlok|ribana|kaşkorse|penye|viskon|şardon)/i;
+    const numberedMatch = lowerText.match(numberedFabricPattern);
+    if (numberedMatch) {
+      fabricType = `${numberedMatch[1]} ${numberedMatch[2].toUpperCase()}`;
+    }
+    
+    // If no numbered pattern, try to find fabric keywords with modifiers
+    if (!fabricType) {
+      const fabricModifiers = ['likralı', 'düz boya', 'melanj', 'çizgili', 'jakarlı'];
+      
+      for (const keyword of FABRIC_KEYWORDS) {
+        if (lowerText.includes(keyword)) {
+          let fullFabric = keyword.toUpperCase();
+          
+          // Check for modifiers before or after
+          for (const modifier of fabricModifiers) {
+            if (lowerText.includes(modifier)) {
+              fullFabric = `${fullFabric} ${modifier.toUpperCase()}`;
+            }
+          }
+          
+          // Check for number before
+          const beforePattern = new RegExp(`(\\d+\\/\\d+)\\s*${keyword}`, 'i');
+          const beforeMatch = lowerText.match(beforePattern);
+          if (beforeMatch) {
+            fullFabric = `${beforeMatch[1]} ${fullFabric}`;
+          }
+          
+          fabricType = fullFabric;
+          break;
+        }
+      }
+    }
+
+    // Parse usage area - more comprehensive
+    let usageArea: string | undefined;
+    for (const usage of USAGE_KEYWORDS) {
+      if (lowerText.includes(usage)) {
+        usageArea = usage.toUpperCase();
         break;
       }
     }
 
-    // Parse usage area
-    const usagePatterns = [
-      /(ana\s*beden|kol|yaka|manşet|etek|biye|ribana|pat)/i,
+    // Parse price - multiple patterns
+    const pricePatterns = [
+      /(\d+(?:[.,]\d+)?)\s*(?:tl|lira|₺)/i,
+      /fiyat[ıi]?\s*(\d+(?:[.,]\d+)?)/i,
+      /(\d+(?:[.,]\d+)?)\s*(?:türk lirası)/i,
     ];
     
-    let usageArea: string | undefined;
-    for (const pattern of usagePatterns) {
+    let price: number | undefined;
+    for (const pattern of pricePatterns) {
       const match = lowerText.match(pattern);
       if (match) {
-        usageArea = match[1].toUpperCase();
+        price = parseFloat(match[1].replace(',', '.'));
         break;
       }
     }
-
-    // Parse price
-    const priceMatch = lowerText.match(/(\d+(?:[.,]\d+)?)\s*(?:tl|lira|₺)?/i);
-    const price = priceMatch ? parseFloat(priceMatch[1].replace(',', '.')) : undefined;
 
     // Parse quantity
-    const quantityMatch = lowerText.match(/(\d+(?:[.,]\d+)?)\s*(?:metre|mt|m)/i);
-    const quantity = quantityMatch ? parseFloat(quantityMatch[1].replace(',', '.')) : undefined;
+    const quantityPatterns = [
+      /(\d+(?:[.,]\d+)?)\s*(?:metre|mt|m\b)/i,
+      /miktar[ıi]?\s*(\d+(?:[.,]\d+)?)/i,
+    ];
+    
+    let quantity: number | undefined;
+    for (const pattern of quantityPatterns) {
+      const match = lowerText.match(pattern);
+      if (match) {
+        quantity = parseFloat(match[1].replace(',', '.'));
+        break;
+      }
+    }
+
+    // Check if command includes "ekle" to auto-add
+    const autoAdd = lowerText.includes('ekle') || lowerText.includes('kaydet') || lowerText.includes('yaz');
 
     return {
+      modelName,
       fabricType,
       usageArea,
       price,
       quantity,
       rawText: text,
+      autoAdd,
     };
   }, []);
 
   const speak = useCallback((text: string) => {
     if ('speechSynthesis' in window) {
+      // Cancel any ongoing speech
+      window.speechSynthesis.cancel();
+      
       const utterance = new SpeechSynthesisUtterance(text);
       utterance.lang = 'tr-TR';
-      utterance.rate = 1;
+      utterance.rate = 1.1;
+      utterance.pitch = 1;
       window.speechSynthesis.speak(utterance);
     }
   }, []);
@@ -134,7 +230,9 @@ export function VoiceCommand({ onCommand }: VoiceCommandProps) {
     recognition.onstart = () => {
       setIsListening(true);
       setTranscript("");
-      toast.info("Dinliyorum... Konuşabilirsiniz");
+      toast.info("🎤 Dinliyorum... Konuşabilirsiniz", {
+        description: "Örnek: 'Loska modeli 40/1 interlok düz boya ana beden 150 TL ekle'"
+      });
     };
 
     recognition.onresult = (event) => {
@@ -148,18 +246,25 @@ export function VoiceCommand({ onCommand }: VoiceCommandProps) {
         const commandData = parseCommand(transcriptText);
         onCommand(commandData);
         
-        // Provide voice feedback
-        if (commandData.fabricType || commandData.usageArea || commandData.price) {
-          let feedback = "Anlaşıldı. ";
-          if (commandData.fabricType) feedback += `Kumaş: ${commandData.fabricType}. `;
-          if (commandData.usageArea) feedback += `Kullanım yeri: ${commandData.usageArea}. `;
-          if (commandData.price) feedback += `Fiyat: ${commandData.price} TL. `;
-          if (commandData.quantity) feedback += `Miktar: ${commandData.quantity} metre. `;
+        // Build comprehensive feedback
+        const parts: string[] = [];
+        if (commandData.modelName) parts.push(`Model: ${commandData.modelName}`);
+        if (commandData.fabricType) parts.push(`Kumaş: ${commandData.fabricType}`);
+        if (commandData.usageArea) parts.push(`Kullanım: ${commandData.usageArea}`);
+        if (commandData.price) parts.push(`Fiyat: ${commandData.price} TL`);
+        if (commandData.quantity) parts.push(`Miktar: ${commandData.quantity} m`);
+        
+        if (parts.length > 0) {
+          const feedback = `Anlaşıldı! ${parts.join(', ')}`;
           speak(feedback);
-          toast.success(feedback);
+          toast.success(feedback, {
+            description: commandData.autoAdd ? "Otomatik ekleniyor..." : "Form alanları dolduruldu"
+          });
         } else {
           speak("Komutu anlayamadım. Lütfen tekrar söyleyin.");
-          toast.warning("Komut anlaşılamadı. Örnek: '40/1 interlok ana beden 150 TL'");
+          toast.warning("Komut anlaşılamadı", {
+            description: "Örnek: 'Model adı kumaş türü kullanım yeri fiyat'"
+          });
         }
       }
     };
@@ -230,10 +335,11 @@ export function VoiceCommand({ onCommand }: VoiceCommandProps) {
       )}
 
       {!isListening && (
-        <div className="mt-2 text-xs text-muted-foreground text-center max-w-xs">
-          <p className="font-medium mb-1">Örnek komutlar:</p>
-          <p>"40/1 interlok ana beden 150 TL"</p>
-          <p>"Süprem kol 2 metre 80 lira"</p>
+        <div className="mt-2 text-xs text-muted-foreground text-center max-w-xs space-y-1">
+          <p className="font-semibold text-foreground">Örnek komutlar:</p>
+          <p className="bg-secondary/30 px-2 py-1 rounded">"Loska 40/1 interlok ana beden 150 TL"</p>
+          <p className="bg-secondary/30 px-2 py-1 rounded">"Begor süprem kol 80 lira ekle"</p>
+          <p className="bg-secondary/30 px-2 py-1 rounded">"Model XYZ ribana yaka 95 TL"</p>
         </div>
       )}
     </div>
