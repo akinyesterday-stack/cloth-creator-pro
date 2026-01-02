@@ -5,7 +5,6 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { SearchableCombobox } from "@/components/SearchableCombobox";
 import { FabricManager, FabricTypeWithSpec } from "@/components/FabricManager";
-import { VoiceCommand, VoiceCommandData, VoiceStep } from "@/components/VoiceCommand";
 import { fabricTypesWithSpecs as defaultFabricTypes, usageAreas as defaultUsageAreas } from "@/data/fabricData";
 import { Calculator, Plus, Trash2, FileSpreadsheet, Package, Image, Upload, X, Pencil, Check, Settings } from "lucide-react";
 import ExcelJS from "exceljs";
@@ -45,10 +44,6 @@ export function CostCalculator() {
   const [gramaj, setGramaj] = useState<number>(0);
   const [fiyat, setFiyat] = useState<number>(0);
 
-  // Voice command wizard states
-  const [voiceStep, setVoiceStep] = useState<VoiceStep>('idle');
-  const [voiceCollectedData, setVoiceCollectedData] = useState<Partial<VoiceCommandData>>({});
-
   // Edit state
   const [editingItemId, setEditingItemId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState<FabricItem | null>(null);
@@ -62,103 +57,6 @@ export function CostCalculator() {
       setGramaj(fabric.gramaj);
     }
   };
-
-  // Voice command handler
-  const handleVoiceCommand = useCallback((command: VoiceCommandData) => {
-    // Handle delete actions
-    if (command.action === 'deleteLast') {
-      if (activeModelId) {
-        const model = models.find(m => m.id === activeModelId);
-        if (model && model.items.length > 0) {
-          const lastItem = model.items[model.items.length - 1];
-          setModels(prev => prev.map(m => 
-            m.id === activeModelId 
-              ? { ...m, items: m.items.slice(0, -1) }
-              : m
-          ));
-          toast.success("Son kayıt silindi", { description: lastItem.fabricType });
-        }
-      }
-      return;
-    }
-
-    if (command.action === 'deleteModel') {
-      if (activeModelId) {
-        const model = models.find(m => m.id === activeModelId);
-        handleRemoveModel(activeModelId);
-        toast.success(`"${model?.modelName}" modeli silindi`);
-        setVoiceStep('idle');
-        setVoiceCollectedData({});
-      }
-      return;
-    }
-
-    if (command.action === 'edit') {
-      if (activeModelId) {
-        const model = models.find(m => m.id === activeModelId);
-        if (model && model.items.length > 0) {
-          handleStartEdit(model.items[model.items.length - 1]);
-          toast.info("Son kayıt düzenleme modunda");
-        }
-      }
-      return;
-    }
-
-    // Handle model selection/creation
-    if (command.modelName) {
-      const existingModel = models.find(m => 
-        m.modelName.toLowerCase() === command.modelName!.toLowerCase()
-      );
-      
-      if (existingModel) {
-        setActiveModelId(existingModel.id);
-      } else {
-        const newModel: ModelGroup = {
-          id: Date.now().toString(),
-          modelName: command.modelName,
-          image: null,
-          items: [],
-        };
-        setModels(prev => [...prev, newModel]);
-        setActiveModelId(newModel.id);
-      }
-    }
-
-    // Handle fabric add
-    if (command.action === 'add' && command.fabricType && command.usageArea) {
-      const targetModelId = activeModelId || models.find(m => m.modelName === command.modelName)?.id;
-      
-      if (targetModelId) {
-        const matchedEn = command.en || en;
-        const matchedGramaj = command.gramaj || gramaj;
-        const matchedPrice = command.price || fiyat;
-
-        const newItem: FabricItem = {
-          id: Date.now().toString(),
-          fabricType: command.fabricType,
-          usageArea: command.usageArea,
-          en: matchedEn,
-          gramaj: matchedGramaj,
-          fiyat: matchedPrice,
-        };
-
-        setModels(prev => prev.map(model => 
-          model.id === targetModelId 
-            ? { ...model, items: [...model.items, newItem] }
-            : model
-        ));
-        
-        toast.success("Kumaş eklendi!", {
-          description: `${command.fabricType} - ${command.usageArea} - ₺${matchedPrice}`
-        });
-      }
-    }
-  }, [activeModelId, models, en, gramaj, fiyat]);
-
-  const handleVoiceReset = useCallback(() => {
-    setVoiceStep('idle');
-    setVoiceCollectedData({});
-  }, []);
 
   const handleAddModel = () => {
     if (!currentModelName.trim()) return;
@@ -454,13 +352,6 @@ export function CostCalculator() {
     <div className="space-y-8 animate-fade-in" onPaste={handleImagePaste}>
       {/* Top Controls */}
       <div className="flex flex-wrap items-start justify-between gap-4">
-        {/* Voice Command */}
-        <Card className="modern-card p-6">
-          <div className="flex items-center gap-4">
-            <VoiceCommand onCommand={handleVoiceCommand} />
-          </div>
-        </Card>
-
         {/* Settings Button */}
         <Button
           variant={showManager ? "default" : "outline"}
