@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, forwardRef } from "react";
 import { Clock, Cloud, CloudRain, Sun, CloudSun, MapPin, Settings, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -59,7 +59,7 @@ const getConditionText = (condition: WeatherData['condition']) => {
   }
 };
 
-export function ClockWeather() {
+export const ClockWeather = forwardRef<HTMLDivElement>(function ClockWeather(_props, ref) {
   const [time, setTime] = useState(new Date());
   const [selectedDistrict, setSelectedDistrict] = useState("Bağcılar");
   const [weather, setWeather] = useState<WeatherData>(getSimulatedWeather("Bağcılar"));
@@ -92,7 +92,7 @@ export function ClockWeather() {
   };
 
   return (
-    <div className="flex items-center gap-6">
+    <div ref={ref} className="flex items-center gap-6">
       {/* Clock & Date */}
       <div className="flex items-center gap-3 px-4 py-2 bg-secondary/50 rounded-xl border border-border/50">
         <Clock className="h-5 w-5 text-primary" />
@@ -151,4 +151,4 @@ export function ClockWeather() {
       </Popover>
     </div>
   );
-}
+});

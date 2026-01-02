@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, forwardRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -26,7 +26,7 @@ interface ModelGroup {
   items: FabricItem[];
 }
 
-export function CostCalculator() {
+export const CostCalculator = forwardRef<HTMLDivElement>(function CostCalculator(_props, ref) {
   const [models, setModels] = useState<ModelGroup[]>([]);
   const [currentModelName, setCurrentModelName] = useState("");
   const [activeModelId, setActiveModelId] = useState<string | null>(null);
@@ -349,7 +349,7 @@ export function CostCalculator() {
   const activeModel = models.find(m => m.id === activeModelId);
 
   return (
-    <div className="space-y-8 animate-fade-in" onPaste={handleImagePaste}>
+    <div ref={ref} className="space-y-8 animate-fade-in" onPaste={handleImagePaste}>
       {/* Top Controls */}
       <div className="flex flex-wrap items-start justify-between gap-4">
         {/* Settings Button */}
@@ -741,4 +741,4 @@ export function CostCalculator() {
       )}
     </div>
   );
-}
+});
