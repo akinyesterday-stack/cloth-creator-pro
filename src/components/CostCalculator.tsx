@@ -200,9 +200,9 @@ export const CostCalculator = forwardRef<HTMLDivElement>(function CostCalculator
       views: [{ showGridLines: true }]
     });
 
-    // Define columns
+    // Define columns - A sütunu genişliği 40
     worksheet.columns = [
-      { header: 'Resim', key: 'resim', width: 18 },
+      { header: 'Resim', key: 'resim', width: 40 },
       { header: 'Model Adı', key: 'modelAdi', width: 20 },
       { header: 'Kumaş Türü', key: 'kumasTuru', width: 45 },
       { header: 'Kullanım Yeri', key: 'kullanimYeri', width: 35 },
@@ -300,9 +300,25 @@ export const CostCalculator = forwardRef<HTMLDivElement>(function CostCalculator
               extension: extension,
             });
 
+            // A sütunu genişliği 40 karaktere karşılık geliyor
+            // Excel'de 1 karakter yaklaşık 7 piksel, 40 karakter ≈ 280 piksel
+            // Satır yüksekliği 60, rowCount satır için toplam yükseklik
+            const colWidthPx = 40 * 7; // ~280 piksel
+            const totalRowHeightPx = 60 * rowCount * 0.75; // Excel pt to px conversion
+            
+            // Hafif padding bırak (her yönden %5)
+            const padding = 0.05;
+            const availableWidth = colWidthPx * (1 - padding * 2);
+            const availableHeight = totalRowHeightPx * (1 - padding * 2);
+            
+            // Resmi orantılı olarak hesapla (kare veya dikdörtgen olabilir)
+            // Genişlik sabit, yükseklik satır sayısına göre
+            const imageWidth = availableWidth;
+            const imageHeight = availableHeight;
+
             worksheet.addImage(imageId, {
-              tl: { col: 0.1, row: startRow - 0.9 },
-              ext: { width: 100, height: 55 * rowCount }
+              tl: { col: 0.08, row: startRow - 0.92 },
+              ext: { width: imageWidth, height: imageHeight }
             });
           }
         } catch (error) {
