@@ -1,5 +1,5 @@
-import { useState, useEffect, forwardRef } from "react";
-import { Clock, Cloud, CloudRain, Sun, CloudSun, MapPin, Settings, Check } from "lucide-react";
+import { useState, useEffect, forwardRef, useCallback } from "react";
+import { Clock, Cloud, CloudRain, Sun, CloudSun, MapPin, Settings, Check, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Popover,
@@ -11,30 +11,32 @@ interface WeatherData {
   temp: number;
   condition: 'sunny' | 'cloudy' | 'partly-cloudy' | 'rainy';
   humidity: number;
+  windSpeed: number;
 }
 
-const DISTRICTS = [
-  "Bağcılar",
-  "Şirinevler",
-  "Bakırköy",
-  "Beylikdüzü",
-  "Esenyurt",
-  "Küçükçekmece",
-  "Bahçelievler",
-  "Güngören",
+interface DistrictInfo {
+  name: string;
+  lat: number;
+  lon: number;
+}
+
+const DISTRICTS: DistrictInfo[] = [
+  { name: "Bağcılar", lat: 41.0397, lon: 28.8573 },
+  { name: "Şirinevler", lat: 40.9983, lon: 28.8378 },
+  { name: "Bakırköy", lat: 40.9819, lon: 28.8772 },
+  { name: "Beylikdüzü", lat: 41.0054, lon: 28.6407 },
+  { name: "Esenyurt", lat: 41.0286, lon: 28.6772 },
+  { name: "Küçükçekmece", lat: 41.0014, lon: 28.7747 },
+  { name: "Bahçelievler", lat: 41.0011, lon: 28.8622 },
+  { name: "Güngören", lat: 41.0136, lon: 28.8772 },
 ];
 
-// Simulated weather data (in real app, would use API)
-const getSimulatedWeather = (district: string): WeatherData => {
-  const conditions: WeatherData['condition'][] = ['sunny', 'cloudy', 'partly-cloudy', 'rainy'];
-  const hash = district.split('').reduce((a, b) => a + b.charCodeAt(0), 0);
-  const conditionIndex = (hash + new Date().getHours()) % conditions.length;
-  
-  return {
-    temp: 15 + (hash % 10),
-    condition: conditions[conditionIndex],
-    humidity: 40 + (hash % 40),
-  };
+// Determine weather condition based on cloud cover and precipitation
+const getConditionFromWeather = (cloudCover: number, precipitation: number): WeatherData['condition'] => {
+  if (precipitation > 0.5) return 'rainy';
+  if (cloudCover > 70) return 'cloudy';
+  if (cloudCover > 30) return 'partly-cloudy';
+  return 'sunny';
 };
 
 const WeatherIcon = ({ condition }: { condition: WeatherData['condition'] }) => {
@@ -61,18 +63,61 @@ const getConditionText = (condition: WeatherData['condition']) => {
 
 export const ClockWeather = forwardRef<HTMLDivElement>(function ClockWeather(_props, ref) {
   const [time, setTime] = useState(new Date());
-  const [selectedDistrict, setSelectedDistrict] = useState("Bağcılar");
-  const [weather, setWeather] = useState<WeatherData>(getSimulatedWeather("Bağcılar"));
+  const [selectedDistrict, setSelectedDistrict] = useState<DistrictInfo>(DISTRICTS[0]);
+  const [weather, setWeather] = useState<WeatherData | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
   const [isOpen, setIsOpen] = useState(false);
+
+  // Fetch weather from Open-Meteo API
+  const fetchWeather = useCallback(async (district: DistrictInfo) => {
+    setIsLoading(true);
+    try {
+      const response = await fetch(
+        `https://api.open-meteo.com/v1/forecast?latitude=${district.lat}&longitude=${district.lon}&current=temperature_2m,relative_humidity_2m,wind_speed_10m,cloud_cover,precipitation&timezone=Europe/Istanbul`
+      );
+      
+      if (!response.ok) throw new Error('Weather fetch failed');
+      
+      const data = await response.json();
+      const current = data.current;
+      
+      setWeather({
+        temp: Math.round(current.temperature_2m),
+        humidity: current.relative_humidity_2m,
+        windSpeed: current.wind_speed_10m,
+        condition: getConditionFromWeather(current.cloud_cover, current.precipitation),
+      });
+    } catch (error) {
+      console.error('Weather fetch error:', error);
+      // Fallback to default values on error
+      setWeather({
+        temp: 18,
+        condition: 'partly-cloudy',
+        humidity: 60,
+        windSpeed: 10,
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
     const timer = setInterval(() => setTime(new Date()), 1000);
     return () => clearInterval(timer);
   }, []);
 
+  // Fetch weather on mount and when district changes
   useEffect(() => {
-    setWeather(getSimulatedWeather(selectedDistrict));
-  }, [selectedDistrict]);
+    fetchWeather(selectedDistrict);
+  }, [selectedDistrict, fetchWeather]);
+
+  // Refresh weather every 10 minutes
+  useEffect(() => {
+    const weatherTimer = setInterval(() => {
+      fetchWeather(selectedDistrict);
+    }, 10 * 60 * 1000);
+    return () => clearInterval(weatherTimer);
+  }, [selectedDistrict, fetchWeather]);
 
   const formatDate = (date: Date) => {
     return date.toLocaleDateString('tr-TR', {
@@ -113,15 +158,25 @@ export const ClockWeather = forwardRef<HTMLDivElement>(function ClockWeather(_pr
             variant="ghost"
             className="flex items-center gap-3 px-4 py-6 bg-secondary/50 rounded-xl border border-border/50 hover:bg-secondary/80"
           >
-            <WeatherIcon condition={weather.condition} />
+            {isLoading ? (
+              <Loader2 className="h-5 w-5 animate-spin text-primary" />
+            ) : weather ? (
+              <WeatherIcon condition={weather.condition} />
+            ) : null}
             <div className="flex flex-col items-start">
               <div className="flex items-center gap-2">
-                <span className="text-lg font-bold text-foreground">{weather.temp}°C</span>
-                <span className="text-xs text-muted-foreground">{getConditionText(weather.condition)}</span>
+                {isLoading ? (
+                  <span className="text-lg font-bold text-foreground">--°C</span>
+                ) : weather ? (
+                  <>
+                    <span className="text-lg font-bold text-foreground">{weather.temp}°C</span>
+                    <span className="text-xs text-muted-foreground">{getConditionText(weather.condition)}</span>
+                  </>
+                ) : null}
               </div>
               <div className="flex items-center gap-1 text-xs text-muted-foreground">
                 <MapPin className="h-3 w-3" />
-                <span>İstanbul, {selectedDistrict}</span>
+                <span>İstanbul, {selectedDistrict.name}</span>
               </div>
             </div>
             <Settings className="h-4 w-4 text-muted-foreground ml-2" />
@@ -132,16 +187,16 @@ export const ClockWeather = forwardRef<HTMLDivElement>(function ClockWeather(_pr
             <h4 className="font-medium text-sm mb-3">Semt Seçin</h4>
             {DISTRICTS.map((district) => (
               <Button
-                key={district}
-                variant={selectedDistrict === district ? "secondary" : "ghost"}
+                key={district.name}
+                variant={selectedDistrict.name === district.name ? "secondary" : "ghost"}
                 className="w-full justify-between h-9 text-sm"
                 onClick={() => {
                   setSelectedDistrict(district);
                   setIsOpen(false);
                 }}
               >
-                {district}
-                {selectedDistrict === district && (
+                {district.name}
+                {selectedDistrict.name === district.name && (
                   <Check className="h-4 w-4 text-primary" />
                 )}
               </Button>
