@@ -300,24 +300,27 @@ export const CostCalculator = forwardRef<HTMLDivElement>(function CostCalculator
               extension: extension,
             });
 
-            // A sütunu genişliği 40 karaktere karşılık geliyor
-            // Excel'de 1 karakter yaklaşık 7 piksel, 40 karakter ≈ 280 piksel
-            // Satır yüksekliği 60, rowCount satır için toplam yükseklik
+            // A sütunu genişliği 40 karakter ≈ 280 piksel
+            // Satır yüksekliği 60 pt, her satır için
             const colWidthPx = 40 * 7; // ~280 piksel
-            const totalRowHeightPx = 60 * rowCount * 0.75; // Excel pt to px conversion
+            const rowHeightPt = 60;
+            const totalRowHeightPx = rowHeightPt * rowCount * 1.33; // pt to px (1pt ≈ 1.33px)
             
-            // Hafif padding bırak (her yönden %5)
-            const padding = 0.05;
-            const availableWidth = colWidthPx * (1 - padding * 2);
-            const availableHeight = totalRowHeightPx * (1 - padding * 2);
+            // Padding: her yönden küçük boşluk
+            const paddingPx = 8;
+            const availableWidth = colWidthPx - (paddingPx * 2);
+            const availableHeight = totalRowHeightPx - (paddingPx * 2);
             
-            // Resmi orantılı olarak hesapla (kare veya dikdörtgen olabilir)
-            // Genişlik sabit, yükseklik satır sayısına göre
+            // Resim tam olarak hücreye sığsın (en ve boy olarak)
             const imageWidth = availableWidth;
             const imageHeight = availableHeight;
 
+            // Başlangıç pozisyonu: padding kadar içeride
+            const colOffset = paddingPx / colWidthPx;
+            const rowOffset = paddingPx / (rowHeightPt * 1.33);
+
             worksheet.addImage(imageId, {
-              tl: { col: 0.08, row: startRow - 0.92 },
+              tl: { col: colOffset, row: startRow - 1 + rowOffset },
               ext: { width: imageWidth, height: imageHeight }
             });
           }

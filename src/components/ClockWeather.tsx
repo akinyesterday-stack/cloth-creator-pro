@@ -1,11 +1,13 @@
 import { useState, useEffect, forwardRef, useCallback } from "react";
-import { Clock, Cloud, CloudRain, Sun, CloudSun, MapPin, Settings, Check, Loader2 } from "lucide-react";
+import { Clock, Cloud, CloudRain, Sun, CloudSun, MapPin, Settings, Check, Loader2, Radio, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import { RadioPlayer } from "./RadioPlayer";
 
 interface WeatherData {
   temp: number;
@@ -14,13 +16,14 @@ interface WeatherData {
   windSpeed: number;
 }
 
-interface DistrictInfo {
+interface LocationInfo {
   name: string;
   lat: number;
   lon: number;
+  isCustom?: boolean;
 }
 
-const DISTRICTS: DistrictInfo[] = [
+const DEFAULT_DISTRICTS: LocationInfo[] = [
   { name: "Bağcılar", lat: 41.0397, lon: 28.8573 },
   { name: "Şirinevler", lat: 40.9983, lon: 28.8378 },
   { name: "Bakırköy", lat: 40.9819, lon: 28.8772 },
@@ -63,17 +66,23 @@ const getConditionText = (condition: WeatherData['condition']) => {
 
 export const ClockWeather = forwardRef<HTMLDivElement>(function ClockWeather(_props, ref) {
   const [time, setTime] = useState(new Date());
-  const [selectedDistrict, setSelectedDistrict] = useState<DistrictInfo>(DISTRICTS[0]);
+  const [selectedLocation, setSelectedLocation] = useState<LocationInfo>(DEFAULT_DISTRICTS[0]);
+  const [customLocations, setCustomLocations] = useState<LocationInfo[]>([]);
   const [weather, setWeather] = useState<WeatherData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isOpen, setIsOpen] = useState(false);
+  const [isRadioOpen, setIsRadioOpen] = useState(false);
+  
+  // Manual location input
+  const [manualInput, setManualInput] = useState("");
+  const [isSearching, setIsSearching] = useState(false);
 
   // Fetch weather from Open-Meteo API
-  const fetchWeather = useCallback(async (district: DistrictInfo) => {
+  const fetchWeather = useCallback(async (location: LocationInfo) => {
     setIsLoading(true);
     try {
       const response = await fetch(
-        `https://api.open-meteo.com/v1/forecast?latitude=${district.lat}&longitude=${district.lon}&current=temperature_2m,relative_humidity_2m,wind_speed_10m,cloud_cover,precipitation&timezone=Europe/Istanbul`
+        `https://api.open-meteo.com/v1/forecast?latitude=${location.lat}&longitude=${location.lon}&current=temperature_2m,relative_humidity_2m,wind_speed_10m,cloud_cover,precipitation&timezone=auto`
       );
       
       if (!response.ok) throw new Error('Weather fetch failed');
@@ -89,7 +98,6 @@ export const ClockWeather = forwardRef<HTMLDivElement>(function ClockWeather(_pr
       });
     } catch (error) {
       console.error('Weather fetch error:', error);
-      // Fallback to default values on error
       setWeather({
         temp: 18,
         condition: 'partly-cloudy',
@@ -101,23 +109,61 @@ export const ClockWeather = forwardRef<HTMLDivElement>(function ClockWeather(_pr
     }
   }, []);
 
+  // Search for location using geocoding API
+  const handleSearchLocation = async () => {
+    if (!manualInput.trim()) return;
+    
+    setIsSearching(true);
+    try {
+      const response = await fetch(
+        `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(manualInput)}&count=1&language=tr`
+      );
+      const data = await response.json();
+      
+      if (data.results && data.results.length > 0) {
+        const result = data.results[0];
+        const newLocation: LocationInfo = {
+          name: result.admin1 ? `${result.name}, ${result.admin1}` : result.name,
+          lat: result.latitude,
+          lon: result.longitude,
+          isCustom: true,
+        };
+        
+        // Add to custom locations if not exists
+        if (!customLocations.some(loc => loc.name === newLocation.name)) {
+          setCustomLocations(prev => [...prev, newLocation]);
+        }
+        
+        setSelectedLocation(newLocation);
+        setManualInput("");
+        setIsOpen(false);
+      } else {
+        console.error('Location not found');
+      }
+    } catch (error) {
+      console.error('Geocoding error:', error);
+    } finally {
+      setIsSearching(false);
+    }
+  };
+
   useEffect(() => {
     const timer = setInterval(() => setTime(new Date()), 1000);
     return () => clearInterval(timer);
   }, []);
 
-  // Fetch weather on mount and when district changes
+  // Fetch weather on mount and when location changes
   useEffect(() => {
-    fetchWeather(selectedDistrict);
-  }, [selectedDistrict, fetchWeather]);
+    fetchWeather(selectedLocation);
+  }, [selectedLocation, fetchWeather]);
 
   // Refresh weather every 10 minutes
   useEffect(() => {
     const weatherTimer = setInterval(() => {
-      fetchWeather(selectedDistrict);
+      fetchWeather(selectedLocation);
     }, 10 * 60 * 1000);
     return () => clearInterval(weatherTimer);
-  }, [selectedDistrict, fetchWeather]);
+  }, [selectedLocation, fetchWeather]);
 
   const formatDate = (date: Date) => {
     return date.toLocaleDateString('tr-TR', {
@@ -136,74 +182,121 @@ export const ClockWeather = forwardRef<HTMLDivElement>(function ClockWeather(_pr
     });
   };
 
-  return (
-    <div ref={ref} className="flex items-center gap-6">
-      {/* Clock & Date */}
-      <div className="flex items-center gap-3 px-4 py-2 bg-secondary/50 rounded-xl border border-border/50">
-        <Clock className="h-5 w-5 text-primary" />
-        <div className="flex flex-col">
-          <span className="text-lg font-mono font-bold text-foreground leading-tight">
-            {formatTime(time)}
-          </span>
-          <span className="text-xs text-muted-foreground leading-tight">
-            {formatDate(time)}
-          </span>
-        </div>
-      </div>
+  const allLocations = [...DEFAULT_DISTRICTS, ...customLocations];
 
-      {/* Weather */}
-      <Popover open={isOpen} onOpenChange={setIsOpen}>
-        <PopoverTrigger asChild>
-          <Button
-            variant="ghost"
-            className="flex items-center gap-3 px-4 py-6 bg-secondary/50 rounded-xl border border-border/50 hover:bg-secondary/80"
-          >
-            {isLoading ? (
-              <Loader2 className="h-5 w-5 animate-spin text-primary" />
-            ) : weather ? (
-              <WeatherIcon condition={weather.condition} />
-            ) : null}
-            <div className="flex flex-col items-start">
-              <div className="flex items-center gap-2">
-                {isLoading ? (
-                  <span className="text-lg font-bold text-foreground">--°C</span>
-                ) : weather ? (
-                  <>
-                    <span className="text-lg font-bold text-foreground">{weather.temp}°C</span>
-                    <span className="text-xs text-muted-foreground">{getConditionText(weather.condition)}</span>
-                  </>
-                ) : null}
+  return (
+    <>
+      <div ref={ref} className="flex items-center gap-4 flex-wrap">
+        {/* Clock & Date */}
+        <div className="flex items-center gap-3 px-4 py-2 bg-secondary/50 rounded-xl border border-border/50">
+          <Clock className="h-5 w-5 text-primary" />
+          <div className="flex flex-col">
+            <span className="text-lg font-mono font-bold text-foreground leading-tight">
+              {formatTime(time)}
+            </span>
+            <span className="text-xs text-muted-foreground leading-tight">
+              {formatDate(time)}
+            </span>
+          </div>
+        </div>
+
+        {/* Weather */}
+        <Popover open={isOpen} onOpenChange={setIsOpen}>
+          <PopoverTrigger asChild>
+            <Button
+              variant="ghost"
+              className="flex items-center gap-3 px-4 py-6 bg-secondary/50 rounded-xl border border-border/50 hover:bg-secondary/80"
+            >
+              {isLoading ? (
+                <Loader2 className="h-5 w-5 animate-spin text-primary" />
+              ) : weather ? (
+                <WeatherIcon condition={weather.condition} />
+              ) : null}
+              <div className="flex flex-col items-start">
+                <div className="flex items-center gap-2">
+                  {isLoading ? (
+                    <span className="text-lg font-bold text-foreground">--°C</span>
+                  ) : weather ? (
+                    <>
+                      <span className="text-lg font-bold text-foreground">{weather.temp}°C</span>
+                      <span className="text-xs text-muted-foreground">{getConditionText(weather.condition)}</span>
+                    </>
+                  ) : null}
+                </div>
+                <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                  <MapPin className="h-3 w-3" />
+                  <span className="max-w-[120px] truncate">{selectedLocation.name}</span>
+                </div>
               </div>
-              <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                <MapPin className="h-3 w-3" />
-                <span>İstanbul, {selectedDistrict.name}</span>
+              <Settings className="h-4 w-4 text-muted-foreground ml-2" />
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-72 p-3" align="end">
+            <div className="space-y-3">
+              {/* Manual Input */}
+              <div className="space-y-2">
+                <h4 className="font-medium text-sm">Manuel Konum Gir</h4>
+                <div className="flex gap-2">
+                  <Input
+                    value={manualInput}
+                    onChange={(e) => setManualInput(e.target.value)}
+                    placeholder="Şehir, ilçe veya ülke..."
+                    className="h-9 text-sm"
+                    onKeyDown={(e) => e.key === "Enter" && handleSearchLocation()}
+                  />
+                  <Button
+                    size="sm"
+                    onClick={handleSearchLocation}
+                    disabled={isSearching || !manualInput.trim()}
+                    className="h-9 px-3"
+                  >
+                    {isSearching ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Search className="h-4 w-4" />
+                    )}
+                  </Button>
+                </div>
+              </div>
+
+              <div className="border-t border-border pt-3">
+                <h4 className="font-medium text-sm mb-2">Hazır Konumlar</h4>
+                <div className="max-h-48 overflow-y-auto space-y-1">
+                  {allLocations.map((location) => (
+                    <Button
+                      key={location.name}
+                      variant={selectedLocation.name === location.name ? "secondary" : "ghost"}
+                      className="w-full justify-between h-8 text-sm"
+                      onClick={() => {
+                        setSelectedLocation(location);
+                        setIsOpen(false);
+                      }}
+                    >
+                      <span className="truncate">{location.name}</span>
+                      {selectedLocation.name === location.name && (
+                        <Check className="h-4 w-4 text-primary flex-shrink-0" />
+                      )}
+                    </Button>
+                  ))}
+                </div>
               </div>
             </div>
-            <Settings className="h-4 w-4 text-muted-foreground ml-2" />
-          </Button>
-        </PopoverTrigger>
-        <PopoverContent className="w-56 p-3" align="end">
-          <div className="space-y-2">
-            <h4 className="font-medium text-sm mb-3">Semt Seçin</h4>
-            {DISTRICTS.map((district) => (
-              <Button
-                key={district.name}
-                variant={selectedDistrict.name === district.name ? "secondary" : "ghost"}
-                className="w-full justify-between h-9 text-sm"
-                onClick={() => {
-                  setSelectedDistrict(district);
-                  setIsOpen(false);
-                }}
-              >
-                {district.name}
-                {selectedDistrict.name === district.name && (
-                  <Check className="h-4 w-4 text-primary" />
-                )}
-              </Button>
-            ))}
-          </div>
-        </PopoverContent>
-      </Popover>
-    </div>
+          </PopoverContent>
+        </Popover>
+
+        {/* Radio Button */}
+        <Button
+          variant="ghost"
+          className="flex items-center gap-2 px-4 py-6 bg-secondary/50 rounded-xl border border-border/50 hover:bg-secondary/80"
+          onClick={() => setIsRadioOpen(true)}
+        >
+          <Radio className="h-5 w-5 text-primary" />
+          <span className="text-sm font-medium">Radyo</span>
+        </Button>
+      </div>
+
+      {/* Radio Player Modal */}
+      <RadioPlayer isOpen={isRadioOpen} onClose={() => setIsRadioOpen(false)} />
+    </>
   );
 });
