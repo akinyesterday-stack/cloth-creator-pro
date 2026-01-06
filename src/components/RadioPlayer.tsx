@@ -1,25 +1,31 @@
 import { useState, useEffect, useRef, forwardRef } from "react";
-import { Radio, X, Play, Pause, Volume2, MapPin, Globe } from "lucide-react";
+import { Radio, X, Play, Pause, Volume2, MapPin, Globe, Minimize2, List } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 
 interface Station {
   name: string;
   country: string;
+  countrycode: string;
   url: string;
+  url_resolved: string;
   tags: string;
   geo_lat: number;
   geo_long: number;
+  favicon: string;
 }
 
 interface RadioPlayerProps {
   isOpen: boolean;
   onClose: () => void;
+  isMinimized?: boolean;
+  onMinimize?: () => void;
 }
 
 export const RadioPlayer = forwardRef<HTMLDivElement, RadioPlayerProps>(
-  function RadioPlayer({ isOpen, onClose }, ref) {
+  function RadioPlayer({ isOpen, onClose, isMinimized = false, onMinimize }, ref) {
     const mapContainerRef = useRef<HTMLDivElement>(null);
     const mapRef = useRef<L.Map | null>(null);
     const markerRef = useRef<L.Marker | null>(null);
@@ -29,9 +35,11 @@ export const RadioPlayer = forwardRef<HTMLDivElement, RadioPlayerProps>(
     const [isPlaying, setIsPlaying] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
     const [status, setStatus] = useState("Bir ülkeye tıklayın");
+    const [stationList, setStationList] = useState<Station[]>([]);
+    const [showList, setShowList] = useState(false);
 
     useEffect(() => {
-      if (!isOpen || !mapContainerRef.current || mapRef.current) return;
+      if (!isOpen || isMinimized || !mapContainerRef.current || mapRef.current) return;
 
       // Initialize map
       mapRef.current = L.map(mapContainerRef.current).setView([20, 0], 2);
@@ -40,50 +48,51 @@ export const RadioPlayer = forwardRef<HTMLDivElement, RadioPlayerProps>(
         attribution: "© OpenStreetMap",
       }).addTo(mapRef.current);
 
-      // Click handler
+      // Click handler - fetch stations by country using coordinates
       mapRef.current.on("click", async (e: L.LeafletMouseEvent) => {
         const lat = e.latlng.lat;
         const lng = e.latlng.lng;
         
         setIsLoading(true);
         setStatus("İstasyonlar aranıyor...");
+        setStationList([]);
 
         try {
-          // Fetch stations by geolocation
-          const response = await fetch(
-            `https://de1.api.radio-browser.info/json/stations/search?limit=10&has_geo_info=true&order=clickcount&reverse=true`
+          // First, get country from coordinates using reverse geocoding
+          const geoResponse = await fetch(
+            `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=3`
           );
-          const allStations: Station[] = await response.json();
+          const geoData = await geoResponse.json();
+          const countryCode = geoData.address?.country_code?.toUpperCase();
           
-          // Find nearest station with geo info
-          let nearestStation: Station | null = null;
-          let minDistance = Infinity;
-          
-          for (const station of allStations) {
-            if (station.geo_lat && station.geo_long && station.url) {
-              const distance = Math.sqrt(
-                Math.pow(station.geo_lat - lat, 2) + Math.pow(station.geo_long - lng, 2)
-              );
-              if (distance < minDistance) {
-                minDistance = distance;
-                nearestStation = station;
-              }
-            }
-          }
-          
-          if (!nearestStation) {
-            // Fallback: get any popular station
-            const fallbackResponse = await fetch(
-              `https://de1.api.radio-browser.info/json/stations/topclick/20`
-            );
-            const popularStations: Station[] = await fallbackResponse.json();
-            nearestStation = popularStations.find(s => s.url) || null;
+          if (!countryCode) {
+            setStatus("Lütfen bir kara parçasına tıklayın");
+            setIsLoading(false);
+            return;
           }
 
-          if (nearestStation) {
-            playStation(nearestStation);
+          // Fetch stations by country code
+          const response = await fetch(
+            `https://de1.api.radio-browser.info/json/stations/bycountrycodeexact/${countryCode}?hidebroken=true&order=clickcount&reverse=true&limit=50`
+          );
+          const stations: Station[] = await response.json();
+          
+          // Filter stations with valid URLs
+          const validStations = stations.filter(s => s.url_resolved || s.url);
+
+          if (validStations.length > 0) {
+            setStationList(validStations);
+            setStatus(`${geoData.address?.country || countryCode}: ${validStations.length} istasyon bulundu`);
+            
+            // Auto-play first station
+            playStation(validStations[0]);
+            
+            // Center map on country
+            if (validStations[0].geo_lat && validStations[0].geo_long) {
+              mapRef.current?.setView([validStations[0].geo_lat, validStations[0].geo_long], 5);
+            }
           } else {
-            setStatus("Radyo bulunamadı, başka bir yere tıklayın.");
+            setStatus(`${geoData.address?.country || "Bu bölgede"} radyo bulunamadı`);
           }
         } catch (error) {
           console.error("Radio fetch error:", error);
@@ -99,7 +108,7 @@ export const RadioPlayer = forwardRef<HTMLDivElement, RadioPlayerProps>(
           mapRef.current = null;
         }
       };
-    }, [isOpen]);
+    }, [isOpen, isMinimized]);
 
     const playStation = (station: Station) => {
       setCurrentStation(station);
@@ -116,14 +125,12 @@ export const RadioPlayer = forwardRef<HTMLDivElement, RadioPlayerProps>(
             .addTo(mapRef.current)
             .bindPopup(`<b>${station.name}</b><br/>${station.country}`)
             .openPopup();
-          
-          mapRef.current.setView([station.geo_lat, station.geo_long], 5);
         }
       }
 
       // Play audio
       if (audioRef.current) {
-        audioRef.current.src = station.url;
+        audioRef.current.src = station.url_resolved || station.url;
         audioRef.current.play().catch(console.error);
         setIsPlaying(true);
       }
@@ -140,15 +147,77 @@ export const RadioPlayer = forwardRef<HTMLDivElement, RadioPlayerProps>(
       setIsPlaying(!isPlaying);
     };
 
+    const handleMinimize = () => {
+      onMinimize?.();
+    };
+
     if (!isOpen) return null;
+
+    // Minimized view - small floating player
+    if (isMinimized) {
+      return (
+        <div
+          ref={ref}
+          className="fixed bottom-4 right-4 z-50 flex items-center gap-3 p-3 bg-card/95 backdrop-blur-xl border border-border/50 rounded-2xl shadow-2xl animate-fade-in"
+        >
+          <Button
+            onClick={togglePlay}
+            disabled={!currentStation || isLoading}
+            size="icon"
+            className="h-12 w-12 rounded-full gradient-primary shadow-lg hover:shadow-xl transition-all hover:scale-105"
+          >
+            {isLoading ? (
+              <div className="h-5 w-5 border-2 border-primary-foreground border-t-transparent rounded-full animate-spin" />
+            ) : isPlaying ? (
+              <Pause className="h-5 w-5" />
+            ) : (
+              <Play className="h-5 w-5 ml-0.5" />
+            )}
+          </Button>
+
+          <div className="flex flex-col min-w-0 max-w-[200px]">
+            <p className="font-medium text-sm truncate">
+              {currentStation?.name || "İstasyon Seçilmedi"}
+            </p>
+            <p className="text-xs text-muted-foreground truncate">
+              {currentStation?.country || "Radyo"}
+            </p>
+          </div>
+
+          {isPlaying && (
+            <Volume2 className="h-4 w-4 text-primary animate-pulse flex-shrink-0" />
+          )}
+
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={onMinimize}
+            className="h-8 w-8 rounded-full hover:bg-secondary"
+          >
+            <Globe className="h-4 w-4" />
+          </Button>
+
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={onClose}
+            className="h-8 w-8 rounded-full hover:bg-destructive/20 hover:text-destructive"
+          >
+            <X className="h-4 w-4" />
+          </Button>
+
+          <audio ref={audioRef} onEnded={() => setIsPlaying(false)} />
+        </div>
+      );
+    }
 
     return (
       <div
         ref={ref}
         className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm animate-fade-in"
-        onClick={(e) => e.target === e.currentTarget && onClose()}
+        onClick={(e) => e.target === e.currentTarget && handleMinimize()}
       >
-        <div className="w-full max-w-4xl h-[80vh] mx-4 flex flex-col rounded-2xl overflow-hidden shadow-2xl border border-border/50 bg-card">
+        <div className="w-full max-w-5xl h-[85vh] mx-4 flex flex-col rounded-2xl overflow-hidden shadow-2xl border border-border/50 bg-card">
           {/* Header */}
           <div className="flex items-center justify-between p-4 border-b border-border/50 bg-gradient-to-r from-primary/10 to-transparent">
             <div className="flex items-center gap-3">
@@ -157,14 +226,82 @@ export const RadioPlayer = forwardRef<HTMLDivElement, RadioPlayerProps>(
               </div>
               <h2 className="text-lg font-bold text-foreground">Dünya Radyo Haritası</h2>
             </div>
-            <Button variant="ghost" size="icon" onClick={onClose} className="rounded-full">
-              <X className="h-5 w-5" />
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                onClick={handleMinimize} 
+                className="rounded-full hover:bg-secondary"
+                title="Küçült (Arka planda çalmaya devam eder)"
+              >
+                <Minimize2 className="h-5 w-5" />
+              </Button>
+              <Button variant="ghost" size="icon" onClick={onClose} className="rounded-full">
+                <X className="h-5 w-5" />
+              </Button>
+            </div>
           </div>
 
-          {/* Map */}
-          <div className="flex-1 relative">
-            <div ref={mapContainerRef} className="absolute inset-0" />
+          {/* Map + Station List */}
+          <div className="flex-1 flex relative">
+            <div ref={mapContainerRef} className="flex-1" />
+            
+            {/* Station List Panel */}
+            {stationList.length > 0 && (
+              <div className="w-80 border-l border-border/50 bg-background/80 backdrop-blur-sm flex flex-col">
+                <div className="p-3 border-b border-border/50 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <List className="h-4 w-4 text-primary" />
+                    <span className="text-sm font-medium">{stationList.length} İstasyon</span>
+                  </div>
+                </div>
+                <ScrollArea className="flex-1">
+                  <div className="p-2 space-y-1">
+                    {stationList.map((station, index) => (
+                      <button
+                        key={`${station.name}-${index}`}
+                        onClick={() => playStation(station)}
+                        className={`w-full text-left p-3 rounded-lg transition-all ${
+                          currentStation?.name === station.name && currentStation?.url === station.url
+                            ? "bg-primary/20 border border-primary/30"
+                            : "hover:bg-secondary/50"
+                        }`}
+                      >
+                        <div className="flex items-center gap-2">
+                          {station.favicon ? (
+                            <img 
+                              src={station.favicon} 
+                              alt="" 
+                              className="w-8 h-8 rounded object-cover"
+                              onError={(e) => {
+                                (e.target as HTMLImageElement).style.display = 'none';
+                              }}
+                            />
+                          ) : (
+                            <div className="w-8 h-8 rounded bg-primary/20 flex items-center justify-center">
+                              <Radio className="h-4 w-4 text-primary" />
+                            </div>
+                          )}
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium truncate">{station.name}</p>
+                            {station.tags && (
+                              <p className="text-xs text-muted-foreground truncate">
+                                {station.tags.split(",").slice(0, 2).join(", ")}
+                              </p>
+                            )}
+                          </div>
+                          {currentStation?.name === station.name && 
+                           currentStation?.url === station.url && 
+                           isPlaying && (
+                            <Volume2 className="h-4 w-4 text-primary animate-pulse flex-shrink-0" />
+                          )}
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </ScrollArea>
+              </div>
+            )}
           </div>
 
           {/* Glass Player Panel */}

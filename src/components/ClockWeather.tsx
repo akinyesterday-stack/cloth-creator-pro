@@ -1,5 +1,5 @@
 import { useState, useEffect, forwardRef, useCallback } from "react";
-import { Clock, Cloud, CloudRain, Sun, CloudSun, MapPin, Settings, Check, Loader2, Radio, Search } from "lucide-react";
+import { Clock, Cloud, CloudRain, Sun, CloudSun, MapPin, Settings, Check, Loader2, Radio, Search, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -72,6 +72,7 @@ export const ClockWeather = forwardRef<HTMLDivElement>(function ClockWeather(_pr
   const [isLoading, setIsLoading] = useState(true);
   const [isOpen, setIsOpen] = useState(false);
   const [isRadioOpen, setIsRadioOpen] = useState(false);
+  const [isRadioMinimized, setIsRadioMinimized] = useState(false);
   
   // Manual location input
   const [manualInput, setManualInput] = useState("");
@@ -147,6 +148,13 @@ export const ClockWeather = forwardRef<HTMLDivElement>(function ClockWeather(_pr
     }
   };
 
+  const handleRemoveCustomLocation = (locationName: string) => {
+    setCustomLocations(prev => prev.filter(loc => loc.name !== locationName));
+    if (selectedLocation.name === locationName) {
+      setSelectedLocation(DEFAULT_DISTRICTS[0]);
+    }
+  };
+
   useEffect(() => {
     const timer = setInterval(() => setTime(new Date()), 1000);
     return () => clearInterval(timer);
@@ -183,6 +191,15 @@ export const ClockWeather = forwardRef<HTMLDivElement>(function ClockWeather(_pr
   };
 
   const allLocations = [...DEFAULT_DISTRICTS, ...customLocations];
+
+  const handleRadioClose = () => {
+    setIsRadioOpen(false);
+    setIsRadioMinimized(false);
+  };
+
+  const handleRadioMinimize = () => {
+    setIsRadioMinimized(!isRadioMinimized);
+  };
 
   return (
     <>
@@ -259,10 +276,44 @@ export const ClockWeather = forwardRef<HTMLDivElement>(function ClockWeather(_pr
                 </div>
               </div>
 
+              {/* Custom Locations */}
+              {customLocations.length > 0 && (
+                <div className="border-t border-border pt-3">
+                  <h4 className="font-medium text-sm mb-2">Eklenen Konumlar</h4>
+                  <div className="space-y-1">
+                    {customLocations.map((location) => (
+                      <div key={location.name} className="flex items-center gap-1">
+                        <Button
+                          variant={selectedLocation.name === location.name ? "secondary" : "ghost"}
+                          className="flex-1 justify-between h-8 text-sm"
+                          onClick={() => {
+                            setSelectedLocation(location);
+                            setIsOpen(false);
+                          }}
+                        >
+                          <span className="truncate">{location.name}</span>
+                          {selectedLocation.name === location.name && (
+                            <Check className="h-4 w-4 text-primary flex-shrink-0" />
+                          )}
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                          onClick={() => handleRemoveCustomLocation(location.name)}
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               <div className="border-t border-border pt-3">
                 <h4 className="font-medium text-sm mb-2">Hazır Konumlar</h4>
                 <div className="max-h-48 overflow-y-auto space-y-1">
-                  {allLocations.map((location) => (
+                  {DEFAULT_DISTRICTS.map((location) => (
                     <Button
                       key={location.name}
                       variant={selectedLocation.name === location.name ? "secondary" : "ghost"}
@@ -288,7 +339,10 @@ export const ClockWeather = forwardRef<HTMLDivElement>(function ClockWeather(_pr
         <Button
           variant="ghost"
           className="flex items-center gap-2 px-4 py-6 bg-secondary/50 rounded-xl border border-border/50 hover:bg-secondary/80"
-          onClick={() => setIsRadioOpen(true)}
+          onClick={() => {
+            setIsRadioOpen(true);
+            setIsRadioMinimized(false);
+          }}
         >
           <Radio className="h-5 w-5 text-primary" />
           <span className="text-sm font-medium">Radyo</span>
@@ -296,7 +350,12 @@ export const ClockWeather = forwardRef<HTMLDivElement>(function ClockWeather(_pr
       </div>
 
       {/* Radio Player Modal */}
-      <RadioPlayer isOpen={isRadioOpen} onClose={() => setIsRadioOpen(false)} />
+      <RadioPlayer 
+        isOpen={isRadioOpen} 
+        onClose={handleRadioClose}
+        isMinimized={isRadioMinimized}
+        onMinimize={handleRadioMinimize}
+      />
     </>
   );
 });
