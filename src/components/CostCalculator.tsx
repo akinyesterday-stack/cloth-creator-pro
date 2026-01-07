@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback, forwardRef } from "react";
+import { useState, useRef, useCallback, forwardRef, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -6,9 +6,11 @@ import { Button } from "@/components/ui/button";
 import { SearchableCombobox } from "@/components/SearchableCombobox";
 import { FabricManager, FabricTypeWithSpec } from "@/components/FabricManager";
 import { fabricTypesWithSpecs as defaultFabricTypes, usageAreas as defaultUsageAreas } from "@/data/fabricData";
-import { Calculator, Plus, Trash2, FileSpreadsheet, Package, Image, Upload, X, Pencil, Check, Settings } from "lucide-react";
+import { Calculator, Plus, Trash2, FileSpreadsheet, Package, Image, Upload, X, Pencil, Check, Settings, Download, Loader2 } from "lucide-react";
 import ExcelJS from "exceljs";
 import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
 
 interface FabricItem {
   id: string;
@@ -27,15 +29,18 @@ interface ModelGroup {
 }
 
 export const CostCalculator = forwardRef<HTMLDivElement>(function CostCalculator(_props, ref) {
+  const { user } = useAuth();
   const [models, setModels] = useState<ModelGroup[]>([]);
   const [currentModelName, setCurrentModelName] = useState("");
   const [activeModelId, setActiveModelId] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   
   // Custom fabric types and usage areas
-  const [fabricTypes, setFabricTypes] = useState<FabricTypeWithSpec[]>(defaultFabricTypes);
-  const [usageAreas, setUsageAreas] = useState<string[]>(defaultUsageAreas);
+  const [fabricTypes, setFabricTypes] = useState<FabricTypeWithSpec[]>([]);
+  const [usageAreas, setUsageAreas] = useState<string[]>([]);
   const [showManager, setShowManager] = useState(false);
+  const [isLoadingData, setIsLoadingData] = useState(true);
+  const [hasLoadedFromSystem, setHasLoadedFromSystem] = useState(false);
   
   // Form states
   const [selectedFabric, setSelectedFabric] = useState("");
@@ -47,6 +52,118 @@ export const CostCalculator = forwardRef<HTMLDivElement>(function CostCalculator
   // Edit state
   const [editingItemId, setEditingItemId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState<FabricItem | null>(null);
+
+  // Load user's fabric types and usage areas from database
+  useEffect(() => {
+    if (!user) return;
+    
+    const loadUserData = async () => {
+      setIsLoadingData(true);
+      try {
+        // Load fabric types
+        const { data: fabricData, error: fabricError } = await supabase
+          .from("user_fabric_types")
+          .select("*")
+          .eq("user_id", user.id);
+
+        if (fabricError) throw fabricError;
+
+        // Load usage areas
+        const { data: usageData, error: usageError } = await supabase
+          .from("user_usage_areas")
+          .select("*")
+          .eq("user_id", user.id);
+
+        if (usageError) throw usageError;
+
+        if (fabricData && fabricData.length > 0) {
+          setFabricTypes(fabricData.map(f => ({ name: f.name, en: f.en, gramaj: f.gramaj })));
+          setHasLoadedFromSystem(true);
+        }
+
+        if (usageData && usageData.length > 0) {
+          setUsageAreas(usageData.map(u => u.name));
+          setHasLoadedFromSystem(true);
+        }
+      } catch (error) {
+        console.error("Error loading user data:", error);
+      } finally {
+        setIsLoadingData(false);
+      }
+    };
+
+    loadUserData();
+  }, [user]);
+
+  // Save fabric types to database
+  const saveFabricTypes = async (types: FabricTypeWithSpec[]) => {
+    if (!user) return;
+
+    try {
+      // Delete existing
+      await supabase.from("user_fabric_types").delete().eq("user_id", user.id);
+
+      // Insert new
+      if (types.length > 0) {
+        const { error } = await supabase.from("user_fabric_types").insert(
+          types.map(t => ({
+            user_id: user.id,
+            name: t.name,
+            en: t.en,
+            gramaj: t.gramaj,
+          }))
+        );
+        if (error) throw error;
+      }
+    } catch (error) {
+      console.error("Error saving fabric types:", error);
+      toast.error("Kumaş türleri kaydedilirken hata oluştu");
+    }
+  };
+
+  // Save usage areas to database
+  const saveUsageAreas = async (areas: string[]) => {
+    if (!user) return;
+
+    try {
+      // Delete existing
+      await supabase.from("user_usage_areas").delete().eq("user_id", user.id);
+
+      // Insert new
+      if (areas.length > 0) {
+        const { error } = await supabase.from("user_usage_areas").insert(
+          areas.map(a => ({
+            user_id: user.id,
+            name: a,
+          }))
+        );
+        if (error) throw error;
+      }
+    } catch (error) {
+      console.error("Error saving usage areas:", error);
+      toast.error("Kullanım yerleri kaydedilirken hata oluştu");
+    }
+  };
+
+  const handleFabricTypesChange = (types: FabricTypeWithSpec[]) => {
+    setFabricTypes(types);
+    saveFabricTypes(types);
+  };
+
+  const handleUsageAreasChange = (areas: string[]) => {
+    setUsageAreas(areas);
+    saveUsageAreas(areas);
+  };
+
+  // Load default system data
+  const handleLoadFromSystem = async () => {
+    setFabricTypes(defaultFabricTypes);
+    setUsageAreas(defaultUsageAreas);
+    await saveFabricTypes(defaultFabricTypes);
+    await saveUsageAreas(defaultUsageAreas);
+    setHasLoadedFromSystem(true);
+    toast.success("Sistem verileri yüklendi ve hesabınıza kaydedildi");
+  };
 
   // Auto-fill en and gramaj when fabric type changes
   const handleFabricChange = (value: string) => {
@@ -369,28 +486,58 @@ export const CostCalculator = forwardRef<HTMLDivElement>(function CostCalculator
 
   return (
     <div ref={ref} className="space-y-8 animate-fade-in" onPaste={handleImagePaste}>
-      {/* Top Controls */}
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        {/* Settings Button */}
-        <Button
-          variant={showManager ? "default" : "outline"}
-          onClick={() => setShowManager(!showManager)}
-          className="gap-2 h-12"
-        >
-          <Settings className="h-4 w-4" />
-          {showManager ? "Yönetimi Kapat" : "Kumaş & Kullanım Yeri Yönetimi"}
-        </Button>
-      </div>
+      {/* Loading or Empty State */}
+      {isLoadingData ? (
+        <Card className="border-none shadow-2xl overflow-hidden">
+          <CardContent className="p-12 flex flex-col items-center justify-center">
+            <Loader2 className="h-8 w-8 animate-spin text-primary mb-4" />
+            <p className="text-muted-foreground">Veriler yükleniyor...</p>
+          </CardContent>
+        </Card>
+      ) : !hasLoadedFromSystem && fabricTypes.length === 0 ? (
+        <Card className="border-none shadow-2xl overflow-hidden bg-gradient-to-br from-card via-card to-primary/5">
+          <CardContent className="p-12 flex flex-col items-center justify-center">
+            <div className="p-4 bg-primary/20 rounded-full mb-6">
+              <Download className="h-10 w-10 text-primary" />
+            </div>
+            <h3 className="text-xl font-bold mb-2">Kumaş ve Kullanım Yeri Verileri</h3>
+            <p className="text-muted-foreground text-center mb-6 max-w-md">
+              Henüz kumaş ve kullanım yeri verisi yok. Sistem varsayılan verilerini yükleyerek başlayabilirsiniz.
+            </p>
+            <Button
+              onClick={handleLoadFromSystem}
+              size="lg"
+              className="gradient-primary hover:opacity-90 px-8"
+            >
+              <Download className="h-5 w-5 mr-2" />
+              Sistemden Yükle
+            </Button>
+          </CardContent>
+        </Card>
+      ) : (
+        <>
+          {/* Top Controls */}
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            {/* Settings Button */}
+            <Button
+              variant={showManager ? "default" : "outline"}
+              onClick={() => setShowManager(!showManager)}
+              className="gap-2 h-12"
+            >
+              <Settings className="h-4 w-4" />
+              {showManager ? "Yönetimi Kapat" : "Kumaş & Kullanım Yeri Yönetimi"}
+            </Button>
+          </div>
 
-      {/* Fabric Manager */}
-      {showManager && (
-        <FabricManager
-          fabricTypes={fabricTypes}
-          usageAreas={usageAreas}
-          onFabricTypesChange={setFabricTypes}
-          onUsageAreasChange={setUsageAreas}
-        />
-      )}
+          {/* Fabric Manager */}
+          {showManager && (
+            <FabricManager
+              fabricTypes={fabricTypes}
+              usageAreas={usageAreas}
+              onFabricTypesChange={handleFabricTypesChange}
+              onUsageAreasChange={handleUsageAreasChange}
+            />
+          )}
 
       {/* Model Creation */}
       <Card className="border-none shadow-2xl overflow-hidden bg-gradient-to-br from-card via-card to-secondary/20">
@@ -757,6 +904,8 @@ export const CostCalculator = forwardRef<HTMLDivElement>(function CostCalculator
             </div>
           </CardContent>
         </Card>
+      )}
+        </>
       )}
     </div>
   );
