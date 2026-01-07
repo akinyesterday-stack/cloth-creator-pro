@@ -51,23 +51,32 @@ export default function Auth() {
     e.preventDefault();
     setErrors({});
     
-    try {
-      loginSchema.parse({ email: loginEmail, password: loginPassword });
-    } catch (error) {
-      if (error instanceof z.ZodError) {
-        const fieldErrors: Record<string, string> = {};
-        error.errors.forEach((err) => {
-          if (err.path[0]) {
-            fieldErrors[err.path[0] as string] = err.message;
-          }
-        });
-        setErrors(fieldErrors);
-        return;
+    // Special case: allow "admin" username to login
+    let emailToUse = loginEmail;
+    if (loginEmail.toLowerCase() === "admin") {
+      emailToUse = "admin@tekstil.com";
+    }
+    
+    // Skip email validation if it's admin shortcut
+    if (loginEmail.toLowerCase() !== "admin") {
+      try {
+        loginSchema.parse({ email: loginEmail, password: loginPassword });
+      } catch (error) {
+        if (error instanceof z.ZodError) {
+          const fieldErrors: Record<string, string> = {};
+          error.errors.forEach((err) => {
+            if (err.path[0]) {
+              fieldErrors[err.path[0] as string] = err.message;
+            }
+          });
+          setErrors(fieldErrors);
+          return;
+        }
       }
     }
 
     setIsLoading(true);
-    const { error } = await signIn(loginEmail, loginPassword);
+    const { error } = await signIn(emailToUse, loginPassword);
     setIsLoading(false);
 
     if (error) {
