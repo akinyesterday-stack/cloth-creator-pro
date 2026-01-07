@@ -50,17 +50,19 @@ export default function Auth() {
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrors({});
-    
+
+    const loginIdentifier = loginEmail.trim();
+
     // Special case: allow "admin" username to login
-    let emailToUse = loginEmail;
-    if (loginEmail.toLowerCase() === "admin") {
+    let emailToUse = loginIdentifier;
+    if (loginIdentifier.toLowerCase() === "admin") {
       emailToUse = "admin@tekstil.com";
     }
-    
+
     // Skip email validation if it's admin shortcut
-    if (loginEmail.toLowerCase() !== "admin") {
+    if (loginIdentifier.toLowerCase() !== "admin") {
       try {
-        loginSchema.parse({ email: loginEmail, password: loginPassword });
+        loginSchema.parse({ email: loginIdentifier, password: loginPassword });
       } catch (error) {
         if (error instanceof z.ZodError) {
           const fieldErrors: Record<string, string> = {};
@@ -225,11 +227,12 @@ export default function Auth() {
             <TabsContent value="login">
               <form onSubmit={handleLogin} className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="login-email">E-posta</Label>
+                  <Label htmlFor="login-email">E-posta veya kullanıcı adı</Label>
                   <Input
                     id="login-email"
-                    type="email"
-                    placeholder="ornek@email.com"
+                    type="text"
+                    autoComplete="username"
+                    placeholder="ornek@email.com veya admin"
                     value={loginEmail}
                     onChange={(e) => setLoginEmail(e.target.value)}
                     className={errors.email ? "border-destructive" : ""}
