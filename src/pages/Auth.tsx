@@ -24,7 +24,7 @@ const signupSchema = z.object({
 
 export default function Auth() {
   const navigate = useNavigate();
-  const { user, profile, isApproved, signIn, signUp, isLoading: authLoading } = useAuth();
+  const { user, profile, isApproved, signIn, signUp, signOut, isLoading: authLoading } = useAuth();
   const { toast } = useToast();
 
   const [isLoading, setIsLoading] = useState(false);
@@ -162,6 +162,16 @@ export default function Auth() {
               }}
             >
               Durumu Kontrol Et
+            </Button>
+            <Button
+              variant="ghost"
+              className="w-full"
+              onClick={async () => {
+                await signOut();
+              }}
+            >
+              <LogIn className="h-4 w-4 mr-2" />
+              Giriş Sayfasına Dön
             </Button>
           </CardContent>
         </Card>

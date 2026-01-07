@@ -71,11 +71,29 @@ export const RadioPlayer = forwardRef<HTMLDivElement, RadioPlayerProps>(
             return;
           }
 
-          // Fetch stations by country code
-          const response = await fetch(
-            `https://de1.api.radio-browser.info/json/stations/bycountrycodeexact/${countryCode}?hidebroken=true&order=clickcount&reverse=true&limit=50`
-          );
-          const stations: Station[] = await response.json();
+          // Fetch stations by country code - try multiple API servers for better results
+          const apiServers = [
+            'de1.api.radio-browser.info',
+            'nl1.api.radio-browser.info', 
+            'at1.api.radio-browser.info'
+          ];
+          
+          let stations: Station[] = [];
+          
+          for (const server of apiServers) {
+            try {
+              const response = await fetch(
+                `https://${server}/json/stations/bycountrycodeexact/${countryCode}?hidebroken=true&order=clickcount&reverse=true&limit=100`
+              );
+              const data: Station[] = await response.json();
+              if (data && data.length > stations.length) {
+                stations = data;
+              }
+              if (stations.length >= 30) break; // Good enough
+            } catch (e) {
+              console.log(`Server ${server} failed, trying next...`);
+            }
+          }
           
           // Filter stations with valid URLs
           const validStations = stations.filter(s => s.url_resolved || s.url);
