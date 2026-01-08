@@ -165,6 +165,112 @@ export default function Admin() {
     }
   };
 
+  // Manual user creation
+  const handleCreateUser = async () => {
+    if (!newUsername.trim() || !newFullName.trim() || !newEmail.trim() || !newPassword.trim()) {
+      toast({
+        title: "Hata",
+        description: "Tüm alanları doldurun",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsCreating(true);
+    try {
+      // Create auth user
+      const { data: authData, error: authError } = await supabase.auth.signUp({
+        email: newEmail,
+        password: newPassword,
+      });
+
+      if (authError) throw authError;
+
+      if (authData.user) {
+        // Create profile as approved
+        const { error: profileError } = await supabase
+          .from("profiles")
+          .insert({
+            user_id: authData.user.id,
+            username: newUsername.trim(),
+            full_name: newFullName.trim(),
+            email: newEmail.trim(),
+            status: "approved",
+          });
+
+        if (profileError) throw profileError;
+
+        // Add user role
+        await supabase.from("user_roles").insert({
+          user_id: authData.user.id,
+          role: "user",
+        });
+
+        toast({
+          title: "Kullanıcı Oluşturuldu",
+          description: `${newFullName} başarıyla eklendi.`,
+        });
+
+        setShowAddUser(false);
+        setNewUsername("");
+        setNewFullName("");
+        setNewEmail("");
+        setNewPassword("");
+        fetchUsers();
+      }
+    } catch (error: any) {
+      console.error("Error creating user:", error);
+      toast({
+        title: "Hata",
+        description: error.message || "Kullanıcı oluşturulurken hata oluştu",
+        variant: "destructive",
+      });
+    } finally {
+      setIsCreating(false);
+    }
+  };
+
+  // Edit user profile
+  const handleStartEdit = (profile: PendingUser) => {
+    setEditingUser(profile);
+    setEditFullName(profile.full_name);
+    setEditEmail(profile.email);
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editingUser) return;
+
+    setIsSavingEdit(true);
+    try {
+      const { error } = await supabase
+        .from("profiles")
+        .update({
+          full_name: editFullName.trim(),
+          email: editEmail.trim(),
+        })
+        .eq("id", editingUser.id);
+
+      if (error) throw error;
+
+      toast({
+        title: "Güncellendi",
+        description: "Kullanıcı bilgileri güncellendi.",
+      });
+
+      setEditingUser(null);
+      fetchUsers();
+    } catch (error) {
+      console.error("Error updating user:", error);
+      toast({
+        title: "Hata",
+        description: "Kullanıcı güncellenirken hata oluştu",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSavingEdit(false);
+    }
+  };
+
   if (authLoading || (!user || !isAdmin)) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
@@ -276,10 +382,77 @@ export default function Admin() {
           {/* All Users */}
           <Card className="modern-card">
             <CardHeader className="bg-gradient-to-r from-primary/10 via-primary/5 to-transparent border-b border-border/50">
-              <CardTitle className="flex items-center gap-3">
-                <Users className="h-6 w-6 text-primary" />
-                <span>Tüm Kullanıcılar</span>
-                <Badge variant="secondary">{allUsers.length}</Badge>
+              <CardTitle className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <Users className="h-6 w-6 text-primary" />
+                  <span>Tüm Kullanıcılar</span>
+                  <Badge variant="secondary">{allUsers.length}</Badge>
+                </div>
+                <Dialog open={showAddUser} onOpenChange={setShowAddUser}>
+                  <DialogTrigger asChild>
+                    <Button size="sm" className="gap-2">
+                      <UserPlus className="h-4 w-4" />
+                      Kullanıcı Ekle
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>Yeni Kullanıcı Ekle</DialogTitle>
+                    </DialogHeader>
+                    <div className="space-y-4">
+                      <div>
+                        <Label htmlFor="new-username">Kullanıcı Adı</Label>
+                        <Input
+                          id="new-username"
+                          value={newUsername}
+                          onChange={(e) => setNewUsername(e.target.value)}
+                          placeholder="kullanici123"
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="new-fullname">Ad Soyad</Label>
+                        <Input
+                          id="new-fullname"
+                          value={newFullName}
+                          onChange={(e) => setNewFullName(e.target.value)}
+                          placeholder="Ahmet Yılmaz"
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="new-email">E-posta</Label>
+                        <Input
+                          id="new-email"
+                          type="email"
+                          value={newEmail}
+                          onChange={(e) => setNewEmail(e.target.value)}
+                          placeholder="ornek@email.com"
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="new-password">Şifre</Label>
+                        <Input
+                          id="new-password"
+                          type="password"
+                          value={newPassword}
+                          onChange={(e) => setNewPassword(e.target.value)}
+                          placeholder="••••••••"
+                        />
+                      </div>
+                      <Button
+                        className="w-full"
+                        onClick={handleCreateUser}
+                        disabled={isCreating}
+                      >
+                        {isCreating ? (
+                          <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                        ) : (
+                          <UserPlus className="h-4 w-4 mr-2" />
+                        )}
+                        Kullanıcı Oluştur
+                      </Button>
+                    </div>
+                  </DialogContent>
+                </Dialog>
               </CardTitle>
             </CardHeader>
             <CardContent className="p-0">
@@ -303,6 +476,14 @@ export default function Admin() {
                           </p>
                         </div>
                         <div className="flex items-center gap-2">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleStartEdit(profile)}
+                            className="h-8 w-8"
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </Button>
                           {profile.status === "approved" && (
                             <Badge className="bg-success/20 text-success border-success/30">
                               <UserCheck className="h-3 w-3 mr-1" />
@@ -330,6 +511,50 @@ export default function Admin() {
             </CardContent>
           </Card>
         </div>
+
+        {/* Edit User Dialog */}
+        <Dialog open={!!editingUser} onOpenChange={(open) => !open && setEditingUser(null)}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Kullanıcı Düzenle</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div>
+                <Label>Kullanıcı Adı</Label>
+                <Input value={editingUser?.username || ""} disabled />
+              </div>
+              <div>
+                <Label htmlFor="edit-fullname">Ad Soyad</Label>
+                <Input
+                  id="edit-fullname"
+                  value={editFullName}
+                  onChange={(e) => setEditFullName(e.target.value)}
+                />
+              </div>
+              <div>
+                <Label htmlFor="edit-email">E-posta</Label>
+                <Input
+                  id="edit-email"
+                  type="email"
+                  value={editEmail}
+                  onChange={(e) => setEditEmail(e.target.value)}
+                />
+              </div>
+              <Button
+                className="w-full"
+                onClick={handleSaveEdit}
+                disabled={isSavingEdit}
+              >
+                {isSavingEdit ? (
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                ) : (
+                  <Check className="h-4 w-4 mr-2" />
+                )}
+                Kaydet
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
       </main>
     </div>
   );
