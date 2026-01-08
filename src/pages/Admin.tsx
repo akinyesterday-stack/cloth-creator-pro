@@ -56,6 +56,7 @@ export default function Admin() {
   const [editingUser, setEditingUser] = useState<PendingUser | null>(null);
   const [editFullName, setEditFullName] = useState("");
   const [editEmail, setEditEmail] = useState("");
+  const [editPassword, setEditPassword] = useState("");
   const [isSavingEdit, setIsSavingEdit] = useState(false);
 
   useEffect(() => {
@@ -235,6 +236,7 @@ export default function Admin() {
     setEditingUser(profile);
     setEditFullName(profile.full_name);
     setEditEmail(profile.email);
+    setEditPassword("");
   };
 
   const handleSaveEdit = async () => {
@@ -242,6 +244,7 @@ export default function Admin() {
 
     setIsSavingEdit(true);
     try {
+      // Update profile
       const { error } = await supabase
         .from("profiles")
         .update({
@@ -252,12 +255,36 @@ export default function Admin() {
 
       if (error) throw error;
 
-      toast({
-        title: "Güncellendi",
-        description: "Kullanıcı bilgileri güncellendi.",
-      });
+      // Update password if provided
+      if (editPassword.trim()) {
+        const { data, error: fnError } = await supabase.functions.invoke("update-user-password", {
+          body: {
+            userId: editingUser.user_id,
+            newPassword: editPassword.trim(),
+          },
+        });
+
+        if (fnError) {
+          toast({
+            title: "Şifre Güncelenemedi",
+            description: fnError.message || "Şifre değiştirme sırasında hata oluştu",
+            variant: "destructive",
+          });
+        } else {
+          toast({
+            title: "Güncellendi",
+            description: "Kullanıcı bilgileri ve şifresi güncellendi.",
+          });
+        }
+      } else {
+        toast({
+          title: "Güncellendi",
+          description: "Kullanıcı bilgileri güncellendi.",
+        });
+      }
 
       setEditingUser(null);
+      setEditPassword("");
       fetchUsers();
     } catch (error) {
       console.error("Error updating user:", error);
@@ -539,6 +566,19 @@ export default function Admin() {
                   value={editEmail}
                   onChange={(e) => setEditEmail(e.target.value)}
                 />
+              </div>
+              <div>
+                <Label htmlFor="edit-password">Yeni Şifre (opsiyonel)</Label>
+                <Input
+                  id="edit-password"
+                  type="password"
+                  placeholder="Değiştirmek için yeni şifre girin"
+                  value={editPassword}
+                  onChange={(e) => setEditPassword(e.target.value)}
+                />
+                <p className="text-xs text-muted-foreground mt-1">
+                  Şifreler güvenlik nedeniyle görüntülenemez, sadece değiştirilebilir.
+                </p>
               </div>
               <Button
                 className="w-full"

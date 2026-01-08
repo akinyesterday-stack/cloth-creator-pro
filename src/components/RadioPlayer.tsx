@@ -171,12 +171,12 @@ export const RadioPlayer = forwardRef<HTMLDivElement, RadioPlayerProps>(
 
     if (!isOpen) return null;
 
-    // Minimized view - small floating player
+    // Minimized view - small floating player at bottom right
     if (isMinimized) {
       return (
         <div
           ref={ref}
-          className="fixed bottom-4 right-4 z-50 flex items-center gap-3 p-3 bg-card/95 backdrop-blur-xl border border-border/50 rounded-2xl shadow-2xl animate-fade-in"
+          className="fixed bottom-6 right-6 z-50 flex items-center gap-4 p-4 bg-card/95 backdrop-blur-xl border border-border/50 rounded-2xl shadow-2xl animate-fade-in min-w-[320px]"
         >
           <Button
             onClick={togglePlay}
