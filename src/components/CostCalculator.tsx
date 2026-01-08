@@ -326,6 +326,7 @@ export const CostCalculator = forwardRef<HTMLDivElement>(function CostCalculator
       { header: 'En (CM)', key: 'en', width: 12 },
       { header: 'Gramaj (GR)', key: 'gramaj', width: 14 },
       { header: 'Fiyat (₺)', key: 'fiyat', width: 14 },
+      { header: 'Birim Gramaj', key: 'birimGramaj', width: 14 },
     ];
 
     // Style header row
@@ -366,6 +367,7 @@ export const CostCalculator = forwardRef<HTMLDivElement>(function CostCalculator
           en: item.en,
           gramaj: item.gramaj,
           fiyat: item.fiyat,
+          birimGramaj: '', // Empty for manual entry
         });
 
         row.height = 60;
@@ -449,7 +451,7 @@ export const CostCalculator = forwardRef<HTMLDivElement>(function CostCalculator
       // Apply thick borders around the entire model group
       for (let r = startRow; r < startRow + rowCount; r++) {
         const row = worksheet.getRow(r);
-        for (let c = 1; c <= 7; c++) {
+        for (let c = 1; c <= 8; c++) {
           const cell = row.getCell(c);
           const existingBorder = cell.border || {};
           
@@ -463,7 +465,7 @@ export const CostCalculator = forwardRef<HTMLDivElement>(function CostCalculator
             left: c === 1 
               ? { style: 'medium', color: { argb: '2563EB' } }
               : existingBorder.left,
-            right: c === 7 
+            right: c === 8 
               ? { style: 'medium', color: { argb: '2563EB' } }
               : existingBorder.right,
           };

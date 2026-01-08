@@ -232,10 +232,10 @@ export const RadioPlayer = forwardRef<HTMLDivElement, RadioPlayerProps>(
     return (
       <div
         ref={ref}
-        className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm animate-fade-in"
+        className="fixed inset-0 z-50 flex items-start justify-center pt-16 bg-background/80 backdrop-blur-sm animate-fade-in overflow-y-auto"
         onClick={(e) => e.target === e.currentTarget && handleMinimize()}
       >
-        <div className="w-full max-w-5xl h-[85vh] mx-4 flex flex-col rounded-2xl overflow-hidden shadow-2xl border border-border/50 bg-card">
+        <div className="w-full max-w-5xl h-[75vh] mx-4 mb-8 flex flex-col rounded-2xl overflow-hidden shadow-2xl border border-border/50 bg-card">
           {/* Header */}
           <div className="flex items-center justify-between p-4 border-b border-border/50 bg-gradient-to-r from-primary/10 to-transparent">
             <div className="flex items-center gap-3">

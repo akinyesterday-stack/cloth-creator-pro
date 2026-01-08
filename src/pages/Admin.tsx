@@ -4,6 +4,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
@@ -16,7 +19,9 @@ import {
   ArrowLeft, 
   Loader2,
   UserCheck,
-  UserX 
+  UserX,
+  UserPlus,
+  Pencil
 } from "lucide-react";
 
 interface PendingUser {
@@ -38,6 +43,20 @@ export default function Admin() {
   const [allUsers, setAllUsers] = useState<PendingUser[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [processingId, setProcessingId] = useState<string | null>(null);
+  
+  // Manual user creation
+  const [showAddUser, setShowAddUser] = useState(false);
+  const [newUsername, setNewUsername] = useState("");
+  const [newFullName, setNewFullName] = useState("");
+  const [newEmail, setNewEmail] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [isCreating, setIsCreating] = useState(false);
+
+  // Edit user
+  const [editingUser, setEditingUser] = useState<PendingUser | null>(null);
+  const [editFullName, setEditFullName] = useState("");
+  const [editEmail, setEditEmail] = useState("");
+  const [isSavingEdit, setIsSavingEdit] = useState(false);
 
   useEffect(() => {
     if (!authLoading && (!user || !isAdmin)) {
@@ -120,16 +139,17 @@ export default function Admin() {
   const handleReject = async (profile: PendingUser) => {
     setProcessingId(profile.id);
     try {
+      // Delete profile so user can re-register
       const { error } = await supabase
         .from("profiles")
-        .update({ status: "rejected" })
+        .delete()
         .eq("id", profile.id);
 
       if (error) throw error;
 
       toast({
         title: "Kullanıcı Reddedildi",
-        description: `${profile.full_name} reddedildi.`,
+        description: `${profile.full_name} reddedildi ve tekrar kayıt olabilir.`,
       });
 
       fetchUsers();
