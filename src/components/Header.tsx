@@ -1,4 +1,4 @@
-import { Scissors, User, LogOut, Shield, Settings } from "lucide-react";
+import { Scissors, User, LogOut, Shield, DollarSign } from "lucide-react";
 import { ClockWeather } from "./ClockWeather";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
@@ -73,15 +73,19 @@ export function Header() {
                     </div>
                   </DropdownMenuLabel>
                   <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => navigate("/fabric-prices")} className="cursor-pointer">
+                    <DollarSign className="h-4 w-4 mr-2" />
+                    Kalite Fiyatları
+                  </DropdownMenuItem>
                   {isAdmin && (
                     <>
                       <DropdownMenuItem onClick={() => navigate("/admin")} className="cursor-pointer">
                         <Shield className="h-4 w-4 mr-2" />
                         Admin Paneli
                       </DropdownMenuItem>
-                      <DropdownMenuSeparator />
                     </>
                   )}
+                  <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={handleSignOut} className="cursor-pointer text-destructive focus:text-destructive">
                     <LogOut className="h-4 w-4 mr-2" />
                     Çıkış Yap

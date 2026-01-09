@@ -6,11 +6,20 @@ import { Button } from "@/components/ui/button";
 import { SearchableCombobox } from "@/components/SearchableCombobox";
 import { FabricManager, FabricTypeWithSpec } from "@/components/FabricManager";
 import { fabricTypesWithSpecs as defaultFabricTypes, usageAreas as defaultUsageAreas } from "@/data/fabricData";
-import { Calculator, Plus, Trash2, FileSpreadsheet, Package, Image, Upload, X, Pencil, Check, Settings, Download, Loader2 } from "lucide-react";
+import { Calculator, Plus, Trash2, FileSpreadsheet, Package, Image, Upload, X, Pencil, Check, Settings, Download, Loader2, Copy, Send } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import ExcelJS from "exceljs";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+
+interface FabricPrice {
+  fabric_name: string;
+  en: number;
+  gramaj: number;
+  fiyat: number;
+}
 
 interface FabricItem {
   id: string;
@@ -42,6 +51,9 @@ export const CostCalculator = forwardRef<HTMLDivElement>(function CostCalculator
   const [isLoadingData, setIsLoadingData] = useState(true);
   const [hasLoadedFromSystem, setHasLoadedFromSystem] = useState(false);
   
+  // Fabric prices from database
+  const [fabricPrices, setFabricPrices] = useState<FabricPrice[]>([]);
+  
   // Form states
   const [selectedFabric, setSelectedFabric] = useState("");
   const [selectedUsage, setSelectedUsage] = useState("");
@@ -52,8 +64,16 @@ export const CostCalculator = forwardRef<HTMLDivElement>(function CostCalculator
   // Edit state
   const [editingItemId, setEditingItemId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState<FabricItem | null>(null);
+  
+  // Model name editing
+  const [editingModelId, setEditingModelId] = useState<string | null>(null);
+  const [editModelName, setEditModelName] = useState("");
+  
+  // Copy to model dialog
+  const [copyDialogOpen, setCopyDialogOpen] = useState(false);
+  const [itemToCopy, setItemToCopy] = useState<{item: FabricItem, sourceModelId: string} | null>(null);
 
-  // Load user's fabric types and usage areas from database
+  // Load user's fabric types, usage areas and prices from database
   useEffect(() => {
     if (!user) return;
     
@@ -76,14 +96,42 @@ export const CostCalculator = forwardRef<HTMLDivElement>(function CostCalculator
 
         if (usageError) throw usageError;
 
-        if (fabricData && fabricData.length > 0) {
+        // Load fabric prices
+        const { data: priceData, error: priceError } = await supabase
+          .from("fabric_prices")
+          .select("fabric_name, en, gramaj, fiyat")
+          .eq("user_id", user.id);
+
+        if (priceError) throw priceError;
+        
+        if (priceData) {
+          setFabricPrices(priceData.map(p => ({
+            fabric_name: p.fabric_name,
+            en: p.en,
+            gramaj: p.gramaj,
+            fiyat: Number(p.fiyat)
+          })));
+        }
+
+        // If no fabric types exist, load defaults automatically for new users
+        if (!fabricData || fabricData.length === 0) {
+          setFabricTypes(defaultFabricTypes);
+          setUsageAreas(defaultUsageAreas);
+          // Save defaults to database
+          await saveFabricTypes(defaultFabricTypes);
+          await saveUsageAreas(defaultUsageAreas);
+          setHasLoadedFromSystem(true);
+        } else {
           setFabricTypes(fabricData.map(f => ({ name: f.name, en: f.en, gramaj: f.gramaj })));
           setHasLoadedFromSystem(true);
         }
 
         if (usageData && usageData.length > 0) {
           setUsageAreas(usageData.map(u => u.name));
-          setHasLoadedFromSystem(true);
+        } else if (!usageData || usageData.length === 0) {
+          // If no usage areas exist, load defaults
+          setUsageAreas(defaultUsageAreas);
+          await saveUsageAreas(defaultUsageAreas);
         }
       } catch (error) {
         console.error("Error loading user data:", error);
@@ -165,9 +213,20 @@ export const CostCalculator = forwardRef<HTMLDivElement>(function CostCalculator
     toast.success("Sistem verileri yüklendi ve hesabınıza kaydedildi");
   };
 
-  // Auto-fill en and gramaj when fabric type changes
+  // Auto-fill en, gramaj, and fiyat when fabric type changes
   const handleFabricChange = (value: string) => {
     setSelectedFabric(value);
+    
+    // First check fabric prices (has fiyat)
+    const priceRecord = fabricPrices.find(p => p.fabric_name === value);
+    if (priceRecord) {
+      setEn(priceRecord.en);
+      setGramaj(priceRecord.gramaj);
+      setFiyat(priceRecord.fiyat);
+      return;
+    }
+    
+    // Fallback to fabric types (no fiyat)
     const fabric = fabricTypes.find(f => f.name === value);
     if (fabric) {
       setEn(fabric.en);
@@ -190,6 +249,28 @@ export const CostCalculator = forwardRef<HTMLDivElement>(function CostCalculator
     setCurrentModelName("");
   };
 
+  // Model name editing handlers
+  const handleStartEditModelName = (modelId: string, currentName: string) => {
+    setEditingModelId(modelId);
+    setEditModelName(currentName);
+  };
+
+  const handleSaveModelName = () => {
+    if (!editingModelId || !editModelName.trim()) return;
+    setModels(models.map(model =>
+      model.id === editingModelId
+        ? { ...model, modelName: editModelName.trim() }
+        : model
+    ));
+    setEditingModelId(null);
+    setEditModelName("");
+  };
+
+  const handleCancelEditModelName = () => {
+    setEditingModelId(null);
+    setEditModelName("");
+  };
+
   const handleAddItem = () => {
     if (!activeModelId || !selectedFabric || !selectedUsage || fiyat <= 0) return;
 
@@ -207,6 +288,21 @@ export const CostCalculator = forwardRef<HTMLDivElement>(function CostCalculator
         ? { ...model, items: [...model.items, newItem] }
         : model
     ));
+    
+    // Save manual fabric type if not exists
+    if (!fabricTypes.find(f => f.name === selectedFabric)) {
+      const newFabricType: FabricTypeWithSpec = { name: selectedFabric, en, gramaj };
+      const updatedTypes = [...fabricTypes, newFabricType];
+      setFabricTypes(updatedTypes);
+      saveFabricTypes(updatedTypes);
+    }
+    
+    // Save manual usage area if not exists
+    if (!usageAreas.includes(selectedUsage)) {
+      const updatedAreas = [...usageAreas, selectedUsage];
+      setUsageAreas(updatedAreas);
+      saveUsageAreas(updatedAreas);
+    }
     
     // Reset form
     setSelectedFabric("");
@@ -254,6 +350,31 @@ export const CostCalculator = forwardRef<HTMLDivElement>(function CostCalculator
   const handleCancelEdit = () => {
     setEditingItemId(null);
     setEditForm(null);
+  };
+
+  // Copy item to another model
+  const handleOpenCopyDialog = (item: FabricItem, sourceModelId: string) => {
+    setItemToCopy({ item, sourceModelId });
+    setCopyDialogOpen(true);
+  };
+
+  const handleCopyToModel = (targetModelId: string) => {
+    if (!itemToCopy) return;
+    
+    const newItem: FabricItem = {
+      ...itemToCopy.item,
+      id: Date.now().toString(),
+    };
+    
+    setModels(models.map(model =>
+      model.id === targetModelId
+        ? { ...model, items: [...model.items, newItem] }
+        : model
+    ));
+    
+    setCopyDialogOpen(false);
+    setItemToCopy(null);
+    toast.success("Satır kopyalandı");
   };
 
   // Image handling
@@ -581,36 +702,79 @@ export const CostCalculator = forwardRef<HTMLDivElement>(function CostCalculator
           {models.length > 0 && (
             <div className="mt-8 flex flex-wrap gap-3">
               {models.map(model => (
-                <Button
-                  key={model.id}
-                  variant={activeModelId === model.id ? "default" : "outline"}
-                  size="lg"
-                  onClick={() => setActiveModelId(model.id)}
-                  className={`relative group transition-all duration-300 hover:scale-105 ${
-                    activeModelId === model.id 
-                      ? 'shadow-lg shadow-primary/30' 
-                      : 'hover:bg-secondary/80'
-                  }`}
-                >
-                  {model.image && (
-                    <div className="w-6 h-6 rounded overflow-hidden mr-2 border border-white/20">
-                      <img src={model.image} alt="" className="w-full h-full object-cover" />
+                <div key={model.id} className="relative group">
+                  {editingModelId === model.id ? (
+                    <div className="flex items-center gap-2 bg-secondary p-2 rounded-lg">
+                      <Input
+                        value={editModelName}
+                        onChange={(e) => setEditModelName(e.target.value)}
+                        onKeyDown={(e) => e.key === "Enter" && handleSaveModelName()}
+                        className="h-9 w-40"
+                        autoFocus
+                      />
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={handleSaveModelName}
+                        className="h-8 w-8 text-green-600 hover:text-green-700 hover:bg-green-100"
+                      >
+                        <Check className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={handleCancelEditModelName}
+                        className="h-8 w-8"
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  ) : (
+                    <Button
+                      variant={activeModelId === model.id ? "default" : "outline"}
+                      size="lg"
+                      onClick={() => setActiveModelId(model.id)}
+                      className={`relative transition-all duration-300 hover:scale-105 ${
+                        activeModelId === model.id 
+                          ? 'shadow-lg shadow-primary/30' 
+                          : 'hover:bg-secondary/80'
+                      }`}
+                    >
+                      {model.image && (
+                        <div className="w-6 h-6 rounded overflow-hidden mr-2 border border-white/20">
+                          <img src={model.image} alt="" className="w-full h-full object-cover" />
+                        </div>
+                      )}
+                      {model.modelName}
+                      <span className="ml-2 text-xs opacity-70 bg-black/10 px-2 py-0.5 rounded-full">
+                        {model.items.length}
+                      </span>
+                    </Button>
+                  )}
+                  {/* Model action buttons */}
+                  {editingModelId !== model.id && (
+                    <div className="absolute -top-2 -right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-all duration-200">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleStartEditModelName(model.id, model.modelName);
+                        }}
+                        className="w-6 h-6 rounded-full bg-blue-500 text-white text-xs flex items-center justify-center shadow-md hover:scale-110"
+                      >
+                        <Pencil className="h-3 w-3" />
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleRemoveModel(model.id);
+                        }}
+                        className="w-6 h-6 rounded-full bg-destructive text-destructive-foreground text-xs flex items-center justify-center shadow-md hover:scale-110"
+                      >
+                        ×
+                      </button>
                     </div>
                   )}
-                  {model.modelName}
-                  <span className="ml-2 text-xs opacity-70 bg-black/10 px-2 py-0.5 rounded-full">
-                    {model.items.length}
-                  </span>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleRemoveModel(model.id);
-                    }}
-                    className="absolute -top-2 -right-2 w-6 h-6 rounded-full bg-destructive text-destructive-foreground text-xs flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-200 shadow-md hover:scale-110"
-                  >
-                    ×
-                  </button>
-                </Button>
+                </div>
               ))}
             </div>
           )}
@@ -857,14 +1021,27 @@ export const CostCalculator = forwardRef<HTMLDivElement>(function CostCalculator
                                     size="icon"
                                     onClick={() => handleStartEdit(item)}
                                     className="h-9 w-9 text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-full transition-all"
+                                    title="Düzenle"
                                   >
                                     <Pencil className="h-4 w-4" />
                                   </Button>
+                                  {models.length > 1 && (
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      onClick={() => handleOpenCopyDialog(item, activeModel.id)}
+                                      className="h-9 w-9 text-purple-600 hover:text-purple-700 hover:bg-purple-50 rounded-full transition-all"
+                                      title="Diğer modele kopyala"
+                                    >
+                                      <Copy className="h-4 w-4" />
+                                    </Button>
+                                  )}
                                   <Button
                                     variant="ghost"
                                     size="icon"
                                     onClick={() => handleRemoveItem(activeModel.id, item.id)}
                                     className="h-9 w-9 text-destructive hover:text-destructive hover:bg-destructive/10 rounded-full transition-all"
+                                    title="Sil"
                                   >
                                     <Trash2 className="h-4 w-4" />
                                   </Button>
@@ -909,6 +1086,48 @@ export const CostCalculator = forwardRef<HTMLDivElement>(function CostCalculator
       )}
         </>
       )}
+
+      {/* Copy to Model Dialog */}
+      <Dialog open={copyDialogOpen} onOpenChange={setCopyDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Copy className="h-5 w-5 text-primary" />
+              Satırı Modele Kopyala
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              <strong>{itemToCopy?.item.fabricType}</strong> satırını hangi modele kopyalamak istiyorsunuz?
+            </p>
+            <ScrollArea className="max-h-[300px]">
+              <div className="space-y-2">
+                {models
+                  .filter(m => m.id !== itemToCopy?.sourceModelId)
+                  .map(model => (
+                    <Button
+                      key={model.id}
+                      variant="outline"
+                      className="w-full justify-start gap-3"
+                      onClick={() => handleCopyToModel(model.id)}
+                    >
+                      {model.image && (
+                        <div className="w-8 h-8 rounded overflow-hidden border">
+                          <img src={model.image} alt="" className="w-full h-full object-cover" />
+                        </div>
+                      )}
+                      <div className="flex-1 text-left">
+                        <p className="font-medium">{model.modelName}</p>
+                        <p className="text-xs text-muted-foreground">{model.items.length} kalem</p>
+                      </div>
+                      <Send className="h-4 w-4 text-primary" />
+                    </Button>
+                  ))}
+              </div>
+            </ScrollArea>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 });

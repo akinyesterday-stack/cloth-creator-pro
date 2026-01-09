@@ -248,7 +248,7 @@ export function FabricManager({
               </div>
             </div>
 
-            <div className="flex gap-3">
+            <div className="flex gap-3 flex-wrap">
               <Button
                 onClick={handleAddFabricType}
                 disabled={!newFabricType.trim()}
@@ -256,6 +256,18 @@ export function FabricManager({
               >
                 <Plus className="h-5 w-5 mr-2" />
                 Ekle
+              </Button>
+
+              <Button
+                variant="destructive"
+                onClick={() => {
+                  onFabricTypesChange([]);
+                }}
+                disabled={fabricTypes.length === 0}
+                className="h-12 px-6"
+              >
+                <Trash2 className="h-5 w-5 mr-2" />
+                Tümünü Sil
               </Button>
 
               <Dialog open={bulkImportOpen} onOpenChange={setBulkImportOpen}>
@@ -519,7 +531,7 @@ export function FabricManager({
               />
             </div>
 
-            <div className="flex gap-3">
+            <div className="flex gap-3 flex-wrap">
               <Button
                 onClick={handleAddUsageArea}
                 disabled={!newUsageArea.trim()}
@@ -527,6 +539,18 @@ export function FabricManager({
               >
                 <Plus className="h-5 w-5 mr-2" />
                 Ekle
+              </Button>
+
+              <Button
+                variant="destructive"
+                onClick={() => {
+                  onUsageAreasChange([]);
+                }}
+                disabled={usageAreas.length === 0}
+                className="h-12 px-6"
+              >
+                <Trash2 className="h-5 w-5 mr-2" />
+                Tümünü Sil
               </Button>
 
               <Dialog open={usageBulkImportOpen} onOpenChange={setUsageBulkImportOpen}>

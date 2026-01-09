@@ -21,7 +21,8 @@ import {
   UserCheck,
   UserX,
   UserPlus,
-  Pencil
+  Pencil,
+  Trash2
 } from "lucide-react";
 
 interface PendingUser {
@@ -159,6 +160,42 @@ export default function Admin() {
       toast({
         title: "Hata",
         description: "Kullanıcı reddedilirken hata oluştu",
+        variant: "destructive",
+      });
+    } finally {
+    setProcessingId(null);
+    }
+  };
+
+  // Delete user (allows re-registration)
+  const handleDeleteUser = async (profile: PendingUser) => {
+    setProcessingId(profile.id);
+    try {
+      // Delete profile so user can re-register
+      const { error } = await supabase
+        .from("profiles")
+        .delete()
+        .eq("id", profile.id);
+
+      if (error) throw error;
+
+      // Also delete user roles
+      await supabase
+        .from("user_roles")
+        .delete()
+        .eq("user_id", profile.user_id);
+
+      toast({
+        title: "Kullanıcı Silindi",
+        description: `${profile.full_name} silindi ve tekrar kayıt olabilir.`,
+      });
+
+      fetchUsers();
+    } catch (error) {
+      console.error("Error deleting user:", error);
+      toast({
+        title: "Hata",
+        description: "Kullanıcı silinirken hata oluştu",
         variant: "destructive",
       });
     } finally {
@@ -510,6 +547,19 @@ export default function Admin() {
                             className="h-8 w-8"
                           >
                             <Pencil className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleDeleteUser(profile)}
+                            disabled={processingId === profile.id}
+                            className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+                          >
+                            {processingId === profile.id ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <Trash2 className="h-4 w-4" />
+                            )}
                           </Button>
                           {profile.status === "approved" && (
                             <Badge className="bg-success/20 text-success border-success/30">
