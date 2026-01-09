@@ -7,6 +7,7 @@ import { AuthProvider, useAuth } from "@/hooks/useAuth";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import Admin from "./pages/Admin";
+import FabricPrices from "./pages/FabricPrices";
 import NotFound from "./pages/NotFound";
 import { Loader2 } from "lucide-react";
 
@@ -51,6 +52,14 @@ function AppRoutes() {
         element={
           <ProtectedRoute>
             <Admin />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/fabric-prices"
+        element={
+          <ProtectedRoute>
+            <FabricPrices />
           </ProtectedRoute>
         }
       />
