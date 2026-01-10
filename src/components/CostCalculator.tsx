@@ -6,7 +6,8 @@ import { Button } from "@/components/ui/button";
 import { SearchableCombobox } from "@/components/SearchableCombobox";
 import { FabricManager, FabricTypeWithSpec } from "@/components/FabricManager";
 import { fabricTypesWithSpecs as defaultFabricTypes, usageAreas as defaultUsageAreas } from "@/data/fabricData";
-import { Calculator, Plus, Trash2, FileSpreadsheet, Package, Image, Upload, X, Pencil, Check, Settings, Download, Loader2, Copy, Send } from "lucide-react";
+import { Calculator, Plus, Trash2, FileSpreadsheet, Package, Image, Upload, X, Pencil, Check, Settings, Download, Loader2, Copy, Send, Radio } from "lucide-react";
+import { RadioPlayer } from "@/components/RadioPlayer";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import ExcelJS from "exceljs";
@@ -72,6 +73,10 @@ export const CostCalculator = forwardRef<HTMLDivElement>(function CostCalculator
   // Copy to model dialog
   const [copyDialogOpen, setCopyDialogOpen] = useState(false);
   const [itemToCopy, setItemToCopy] = useState<{item: FabricItem, sourceModelId: string} | null>(null);
+  
+  // Radio player state
+  const [isRadioOpen, setIsRadioOpen] = useState(false);
+  const [isRadioMinimized, setIsRadioMinimized] = useState(false);
 
   // Load user's fabric types, usage areas and prices from database
   useEffect(() => {
@@ -780,6 +785,44 @@ export const CostCalculator = forwardRef<HTMLDivElement>(function CostCalculator
           )}
         </CardContent>
       </Card>
+
+      {/* Radio Section */}
+      <Card className="border-none shadow-xl overflow-hidden bg-gradient-to-br from-card to-primary/5">
+        <CardContent className="p-6">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="p-3 bg-primary/20 rounded-xl">
+                <Radio className="h-6 w-6 text-primary" />
+              </div>
+              <div>
+                <h3 className="font-bold text-foreground">Dünya Radyo</h3>
+                <p className="text-sm text-muted-foreground">Haritadan ülke seçerek radyo dinleyin</p>
+              </div>
+            </div>
+            <Button
+              onClick={() => {
+                setIsRadioOpen(true);
+                setIsRadioMinimized(false);
+              }}
+              className="gradient-primary hover:opacity-90 shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105"
+            >
+              <Radio className="h-4 w-4 mr-2" />
+              Radyo Aç
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Radio Player */}
+      <RadioPlayer
+        isOpen={isRadioOpen}
+        onClose={() => {
+          setIsRadioOpen(false);
+          setIsRadioMinimized(false);
+        }}
+        isMinimized={isRadioMinimized}
+        onMinimize={() => setIsRadioMinimized(!isRadioMinimized)}
+      />
 
       {/* Fabric Entry Form */}
       {activeModel && (

@@ -1,5 +1,5 @@
 import { useState, useEffect, forwardRef, useCallback } from "react";
-import { Clock, Cloud, CloudRain, Sun, CloudSun, MapPin, Settings, Check, Loader2, Radio, Search, Trash2 } from "lucide-react";
+import { Clock, Cloud, CloudRain, Sun, CloudSun, MapPin, Settings, Check, Loader2, Search, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -7,7 +7,6 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { RadioPlayer } from "./RadioPlayer";
 
 interface WeatherData {
   temp: number;
@@ -71,8 +70,6 @@ export const ClockWeather = forwardRef<HTMLDivElement>(function ClockWeather(_pr
   const [weather, setWeather] = useState<WeatherData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isOpen, setIsOpen] = useState(false);
-  const [isRadioOpen, setIsRadioOpen] = useState(false);
-  const [isRadioMinimized, setIsRadioMinimized] = useState(false);
   
   // Manual location input
   const [manualInput, setManualInput] = useState("");
@@ -191,15 +188,6 @@ export const ClockWeather = forwardRef<HTMLDivElement>(function ClockWeather(_pr
   };
 
   const allLocations = [...DEFAULT_DISTRICTS, ...customLocations];
-
-  const handleRadioClose = () => {
-    setIsRadioOpen(false);
-    setIsRadioMinimized(false);
-  };
-
-  const handleRadioMinimize = () => {
-    setIsRadioMinimized(!isRadioMinimized);
-  };
 
   return (
     <>
@@ -334,28 +322,7 @@ export const ClockWeather = forwardRef<HTMLDivElement>(function ClockWeather(_pr
             </div>
           </PopoverContent>
         </Popover>
-
-        {/* Radio Button */}
-        <Button
-          variant="ghost"
-          className="flex items-center gap-2 px-4 py-6 bg-secondary/50 rounded-xl border border-border/50 hover:bg-secondary/80"
-          onClick={() => {
-            setIsRadioOpen(true);
-            setIsRadioMinimized(false);
-          }}
-        >
-          <Radio className="h-5 w-5 text-primary" />
-          <span className="text-sm font-medium">Radyo</span>
-        </Button>
       </div>
-
-      {/* Radio Player Modal */}
-      <RadioPlayer 
-        isOpen={isRadioOpen} 
-        onClose={handleRadioClose}
-        isMinimized={isRadioMinimized}
-        onMinimize={handleRadioMinimize}
-      />
     </>
   );
 });
