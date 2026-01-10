@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { SearchableCombobox } from "@/components/SearchableCombobox";
 import { FabricManager, FabricTypeWithSpec } from "@/components/FabricManager";
 import { fabricTypesWithSpecs as defaultFabricTypes, usageAreas as defaultUsageAreas } from "@/data/fabricData";
-import { Calculator, Plus, Trash2, FileSpreadsheet, Package, Image, Upload, X, Pencil, Check, Settings, Download, Loader2, Copy, Send, Radio } from "lucide-react";
+import { Calculator, Plus, Trash2, FileSpreadsheet, Package, Image, Upload, X, Pencil, Check, Settings, Download, Loader2, Copy, Send } from "lucide-react";
 import { RadioPlayer } from "@/components/RadioPlayer";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -38,7 +38,17 @@ interface ModelGroup {
   items: FabricItem[];
 }
 
-export const CostCalculator = forwardRef<HTMLDivElement>(function CostCalculator(_props, ref) {
+interface CostCalculatorProps {
+  isRadioOpen?: boolean;
+  isRadioMinimized?: boolean;
+  onRadioClose?: () => void;
+  onRadioMinimize?: () => void;
+}
+
+export const CostCalculator = forwardRef<HTMLDivElement, CostCalculatorProps>(function CostCalculator(
+  { isRadioOpen = false, isRadioMinimized = false, onRadioClose, onRadioMinimize },
+  ref
+) {
   const { user } = useAuth();
   const [models, setModels] = useState<ModelGroup[]>([]);
   const [currentModelName, setCurrentModelName] = useState("");
@@ -73,10 +83,6 @@ export const CostCalculator = forwardRef<HTMLDivElement>(function CostCalculator
   // Copy to model dialog
   const [copyDialogOpen, setCopyDialogOpen] = useState(false);
   const [itemToCopy, setItemToCopy] = useState<{item: FabricItem, sourceModelId: string} | null>(null);
-  
-  // Radio player state
-  const [isRadioOpen, setIsRadioOpen] = useState(false);
-  const [isRadioMinimized, setIsRadioMinimized] = useState(false);
 
   // Load user's fabric types, usage areas and prices from database
   useEffect(() => {
@@ -786,43 +792,25 @@ export const CostCalculator = forwardRef<HTMLDivElement>(function CostCalculator
         </CardContent>
       </Card>
 
-      {/* Radio Section */}
-      <Card className="border-none shadow-xl overflow-hidden bg-gradient-to-br from-card to-primary/5">
-        <CardContent className="p-6">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="p-3 bg-primary/20 rounded-xl">
-                <Radio className="h-6 w-6 text-primary" />
-              </div>
-              <div>
-                <h3 className="font-bold text-foreground">Dünya Radyo</h3>
-                <p className="text-sm text-muted-foreground">Haritadan ülke seçerek radyo dinleyin</p>
-              </div>
-            </div>
-            <Button
-              onClick={() => {
-                setIsRadioOpen(true);
-                setIsRadioMinimized(false);
-              }}
-              className="gradient-primary hover:opacity-90 shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105"
-            >
-              <Radio className="h-4 w-4 mr-2" />
-              Radyo Aç
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Radio Player */}
-      <RadioPlayer
-        isOpen={isRadioOpen}
-        onClose={() => {
-          setIsRadioOpen(false);
-          setIsRadioMinimized(false);
-        }}
-        isMinimized={isRadioMinimized}
-        onMinimize={() => setIsRadioMinimized(!isRadioMinimized)}
-      />
+      {/* Radio Player - opened from ClockWeather button */}
+      {isRadioOpen && !isRadioMinimized && (
+        <RadioPlayer
+          isOpen={isRadioOpen}
+          onClose={() => onRadioClose?.()}
+          isMinimized={false}
+          onMinimize={() => onRadioMinimize?.()}
+        />
+      )}
+      
+      {/* Minimized Radio Player - floating at bottom right */}
+      {isRadioOpen && isRadioMinimized && (
+        <RadioPlayer
+          isOpen={isRadioOpen}
+          onClose={() => onRadioClose?.()}
+          isMinimized={true}
+          onMinimize={() => onRadioMinimize?.()}
+        />
+      )}
 
       {/* Fabric Entry Form */}
       {activeModel && (

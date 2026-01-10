@@ -13,7 +13,12 @@ import {
 import { useNavigate } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
 
-export function Header() {
+interface HeaderProps {
+  onRadioToggle?: () => void;
+  isRadioOpen?: boolean;
+}
+
+export function Header({ onRadioToggle, isRadioOpen = false }: HeaderProps) {
   const { user, profile, isAdmin, signOut } = useAuth();
   const navigate = useNavigate();
 
@@ -44,8 +49,8 @@ export function Header() {
           </div>
           
           <div className="flex items-center gap-4">
-            <div className="hidden lg:block">
-              <ClockWeather />
+            <div className="hidden sm:block">
+              <ClockWeather onRadioToggle={onRadioToggle} isRadioOpen={isRadioOpen} />
             </div>
 
             {/* User Menu */}
@@ -97,8 +102,8 @@ export function Header() {
         </div>
 
         {/* Mobile Clock/Weather */}
-        <div className="lg:hidden pb-4 -mt-2">
-          <ClockWeather />
+        <div className="sm:hidden pb-4 -mt-2">
+          <ClockWeather onRadioToggle={onRadioToggle} isRadioOpen={isRadioOpen} />
         </div>
       </div>
     </header>
