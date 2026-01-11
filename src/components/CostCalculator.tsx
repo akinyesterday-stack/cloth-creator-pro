@@ -34,7 +34,7 @@ interface FabricItem {
 interface ModelGroup {
   id: string;
   modelName: string;
-  image: string | null;
+  images: string[]; // up to 10 images per model
   items: FabricItem[];
 }
 
@@ -247,14 +247,14 @@ export const CostCalculator = forwardRef<HTMLDivElement, CostCalculatorProps>(fu
 
   const handleAddModel = () => {
     if (!currentModelName.trim()) return;
-    
+
     const newModel: ModelGroup = {
       id: Date.now().toString(),
       modelName: currentModelName.trim(),
-      image: null,
+      images: [],
       items: [],
     };
-    
+
     setModels([...models, newModel]);
     setActiveModelId(newModel.id);
     setCurrentModelName("");
@@ -388,56 +388,78 @@ export const CostCalculator = forwardRef<HTMLDivElement, CostCalculatorProps>(fu
     toast.success("Satır kopyalandı");
   };
 
-  // Image handling
-  const handleImagePaste = useCallback((e: React.ClipboardEvent) => {
-    if (!activeModelId) return;
-    
-    const items = e.clipboardData?.items;
-    if (!items) return;
+  // Image handling (multi-image per model, max 10)
+  const MAX_MODEL_IMAGES = 10;
 
-    for (const item of items) {
-      if (item.type.startsWith('image/')) {
-        const file = item.getAsFile();
-        if (file) {
+  const addImagesToActiveModel = useCallback(
+    (newImages: string[]) => {
+      if (!activeModelId || newImages.length === 0) return;
+
+      setModels((prev) =>
+        prev.map((model) => {
+          if (model.id !== activeModelId) return model;
+          const merged = [...model.images, ...newImages].slice(0, MAX_MODEL_IMAGES);
+          return { ...model, images: merged };
+        })
+      );
+    },
+    [activeModelId]
+  );
+
+  const handleImagePaste = useCallback(
+    (e: React.ClipboardEvent) => {
+      if (!activeModelId) return;
+
+      const items = e.clipboardData?.items;
+      if (!items) return;
+
+      for (const item of items) {
+        if (item.type.startsWith("image/")) {
+          const file = item.getAsFile();
+          if (!file) break;
+
           const reader = new FileReader();
           reader.onload = (event) => {
             const imageData = event.target?.result as string;
-            setModels(prev => prev.map(model =>
-              model.id === activeModelId
-                ? { ...model, image: imageData }
-                : model
-            ));
+            addImagesToActiveModel([imageData]);
           };
           reader.readAsDataURL(file);
+          break;
         }
-        break;
       }
-    }
-  }, [activeModelId]);
+    },
+    [activeModelId, addImagesToActiveModel]
+  );
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (!activeModelId || !e.target.files?.[0]) return;
-    
-    const file = e.target.files[0];
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const imageData = event.target?.result as string;
-      setModels(prev => prev.map(model =>
-        model.id === activeModelId
-          ? { ...model, image: imageData }
-          : model
-      ));
-    };
-    reader.readAsDataURL(file);
-    e.target.value = '';
+    if (!activeModelId || !e.target.files || e.target.files.length === 0) return;
+
+    const files = Array.from(e.target.files).slice(0, MAX_MODEL_IMAGES);
+    const readers = files.map(
+      (file) =>
+        new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result as string);
+          reader.onerror = () => reject(new Error("File read error"));
+          reader.readAsDataURL(file);
+        })
+    );
+
+    Promise.all(readers)
+      .then((images) => addImagesToActiveModel(images))
+      .catch((err) => console.error(err));
+
+    e.target.value = "";
   };
 
-  const handleRemoveImage = (modelId: string) => {
-    setModels(prev => prev.map(model =>
-      model.id === modelId
-        ? { ...model, image: null }
-        : model
-    ));
+  const handleRemoveImage = (modelId: string, index: number) => {
+    setModels((prev) =>
+      prev.map((model) => {
+        if (model.id !== modelId) return model;
+        const next = model.images.filter((_, i) => i !== index);
+        return { ...model, images: next };
+      })
+    );
   };
 
   const handleExportExcel = async () => {
@@ -536,19 +558,64 @@ export const CostCalculator = forwardRef<HTMLDivElement, CostCalculatorProps>(fu
         worksheet.mergeCells(startRow, 2, startRow + rowCount - 1, 2); // Model Adı
       }
 
-      // Add image if exists
-      if (model.image) {
+      // Add image(s) if exists
+      if (model.images.length > 0) {
         try {
-          // Extract base64 data
-          const base64Match = model.image.match(/^data:image\/(png|jpeg|jpg|gif);base64,(.+)$/);
+          const composeImagesHorizontal = async (images: string[]) => {
+            const load = (src: string) =>
+              new Promise<HTMLImageElement>((resolve, reject) => {
+                const img = new window.Image();
+                img.onload = () => resolve(img);
+                img.onerror = reject;
+                img.src = src;
+              });
+
+            const imgs = await Promise.all(images.map(load));
+            const maxH = Math.max(...imgs.map((i) => i.naturalHeight || i.height));
+            const gap = 16;
+
+            const scaled = imgs.map((img) => {
+              const h = maxH;
+              const w = Math.round(((img.naturalWidth || img.width) / (img.naturalHeight || img.height)) * h);
+              return { img, w, h };
+            });
+
+            const totalW = scaled.reduce((sum, s) => sum + s.w, 0) + gap * (scaled.length - 1);
+
+            const canvas = document.createElement("canvas");
+            canvas.width = Math.min(totalW, 2400);
+            const scaleDown = canvas.width / totalW;
+            canvas.height = Math.round(maxH * scaleDown);
+
+            const ctx = canvas.getContext("2d");
+            if (!ctx) throw new Error("Canvas not supported");
+
+            ctx.fillStyle = "#FFFFFF";
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            let x = 0;
+            for (const s of scaled) {
+              const w = Math.round(s.w * scaleDown);
+              const h = Math.round(s.h * scaleDown);
+              ctx.drawImage(s.img, x, 0, w, h);
+              x += w + Math.round(gap * scaleDown);
+            }
+
+            return canvas.toDataURL("image/png");
+          };
+
+          const composite =
+            model.images.length === 1 ? model.images[0] : await composeImagesHorizontal(model.images);
+
+          const base64Match = composite.match(/^data:image\/(png|jpeg|jpg|gif);base64,(.+)$/);
           if (base64Match) {
             const extRaw = base64Match[1];
             const base64Data = base64Match[2];
-            const extension = (extRaw === 'jpg' ? 'jpeg' : extRaw) as 'png' | 'jpeg' | 'gif';
+            const extension = (extRaw === "jpg" ? "jpeg" : extRaw) as "png" | "jpeg" | "gif";
 
             const imageId = workbook.addImage({
               base64: base64Data,
-              extension: extension,
+              extension,
             });
 
             // A sütunu genişliği 40 karakter ≈ 280 piksel
@@ -556,12 +623,12 @@ export const CostCalculator = forwardRef<HTMLDivElement, CostCalculatorProps>(fu
             const colWidthPx = 40 * 7; // ~280 piksel
             const rowHeightPt = 60;
             const totalRowHeightPx = rowHeightPt * rowCount * 1.33; // pt to px (1pt ≈ 1.33px)
-            
+
             // Padding: her yönden küçük boşluk
             const paddingPx = 8;
-            const availableWidth = colWidthPx - (paddingPx * 2);
-            const availableHeight = totalRowHeightPx - (paddingPx * 2);
-            
+            const availableWidth = colWidthPx - paddingPx * 2;
+            const availableHeight = totalRowHeightPx - paddingPx * 2;
+
             // Resim tam olarak hücreye sığsın (en ve boy olarak)
             const imageWidth = availableWidth;
             const imageHeight = availableHeight;
@@ -572,11 +639,11 @@ export const CostCalculator = forwardRef<HTMLDivElement, CostCalculatorProps>(fu
 
             worksheet.addImage(imageId, {
               tl: { col: colOffset, row: startRow - 1 + rowOffset },
-              ext: { width: imageWidth, height: imageHeight }
+              ext: { width: imageWidth, height: imageHeight },
             });
           }
         } catch (error) {
-          console.error('Image processing error:', error);
+          console.error("Image processing error:", error);
         }
       }
 
@@ -746,14 +813,12 @@ export const CostCalculator = forwardRef<HTMLDivElement, CostCalculatorProps>(fu
                       size="lg"
                       onClick={() => setActiveModelId(model.id)}
                       className={`relative transition-all duration-300 hover:scale-105 ${
-                        activeModelId === model.id 
-                          ? 'shadow-lg shadow-primary/30' 
-                          : 'hover:bg-secondary/80'
+                        activeModelId === model.id ? "shadow-lg shadow-primary/30" : "hover:bg-secondary/80"
                       }`}
                     >
-                      {model.image && (
+                      {model.images.length > 0 && (
                         <div className="w-6 h-6 rounded overflow-hidden mr-2 border border-white/20">
-                          <img src={model.image} alt="" className="w-full h-full object-cover" />
+                          <img src={model.images[0]} alt="" className="w-full h-full object-cover" />
                         </div>
                       )}
                       {model.modelName}
@@ -826,37 +891,57 @@ export const CostCalculator = forwardRef<HTMLDivElement, CostCalculatorProps>(fu
           </CardHeader>
           <CardContent className="p-8 space-y-8">
             {/* Image Upload Section */}
-            <div className="flex items-start gap-6 p-6 bg-gradient-to-br from-muted/30 to-transparent rounded-2xl border border-border/50">
-              <div className="flex-shrink-0">
-                {activeModel.image ? (
-                  <div className="relative group">
-                    <div className="w-32 h-32 rounded-xl overflow-hidden border-4 border-primary/20 shadow-lg">
-                      <img 
-                        src={activeModel.image} 
-                        alt={activeModel.modelName} 
-                        className="w-full h-full object-cover"
-                      />
+            <div className="flex flex-col sm:flex-row items-start gap-6 p-6 bg-gradient-to-br from-muted/30 to-transparent rounded-2xl border border-border/50">
+              <div className="flex-shrink-0 w-full sm:w-auto">
+                {activeModel.images.length > 0 ? (
+                  <div className="space-y-3">
+                    <div className="grid grid-cols-5 gap-2">
+                      {activeModel.images.map((img, idx) => (
+                        <div key={idx} className="relative group">
+                          <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-lg overflow-hidden border border-border/50 shadow-sm">
+                            <img src={img} alt={`${activeModel.modelName} ${idx + 1}`} className="w-full h-full object-cover" />
+                          </div>
+                          <button
+                            onClick={() => handleRemoveImage(activeModel.id, idx)}
+                            className="absolute -top-2 -right-2 w-7 h-7 rounded-full bg-destructive text-destructive-foreground flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all shadow-lg hover:scale-110"
+                            title="Resmi sil"
+                          >
+                            <X className="h-4 w-4" />
+                          </button>
+                        </div>
+                      ))}
+
+                      {activeModel.images.length < 10 && (
+                        <button
+                          type="button"
+                          onClick={() => fileInputRef.current?.click()}
+                          className="w-14 h-14 sm:w-16 sm:h-16 rounded-lg border-2 border-dashed border-primary/30 bg-primary/5 hover:bg-primary/10 transition-all flex items-center justify-center"
+                          title="Resim ekle"
+                        >
+                          <Plus className="h-5 w-5 text-primary/70" />
+                        </button>
+                      )}
                     </div>
-                    <button
-                      onClick={() => handleRemoveImage(activeModel.id)}
-                      className="absolute -top-2 -right-2 w-8 h-8 rounded-full bg-destructive text-destructive-foreground flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all shadow-lg hover:scale-110"
-                    >
-                      <X className="h-4 w-4" />
-                    </button>
+                    <p className="text-xs text-muted-foreground">
+                      {activeModel.images.length}/10 resim
+                    </p>
                   </div>
                 ) : (
-                  <div 
-                    className="w-32 h-32 rounded-xl border-3 border-dashed border-primary/30 bg-gradient-to-br from-primary/5 to-primary/10 flex flex-col items-center justify-center cursor-pointer hover:border-primary/50 hover:bg-primary/15 transition-all duration-300 group"
+                  <button
+                    type="button"
+                    className="w-full sm:w-32 h-24 sm:h-32 rounded-xl border-3 border-dashed border-primary/30 bg-gradient-to-br from-primary/5 to-primary/10 flex flex-col items-center justify-center cursor-pointer hover:border-primary/50 hover:bg-primary/15 transition-all duration-300 group"
                     onClick={() => fileInputRef.current?.click()}
                   >
                     <Image className="h-8 w-8 text-primary/50 group-hover:text-primary/70 transition-colors mb-2" />
                     <span className="text-xs text-muted-foreground text-center px-2">Ctrl+V veya tıkla</span>
-                  </div>
+                  </button>
                 )}
+
                 <input
                   ref={fileInputRef}
                   type="file"
                   accept="image/*"
+                  multiple
                   onChange={handleImageUpload}
                   className="hidden"
                 />
@@ -864,11 +949,12 @@ export const CostCalculator = forwardRef<HTMLDivElement, CostCalculatorProps>(fu
               <div className="flex-1 space-y-2">
                 <h4 className="font-semibold text-foreground flex items-center gap-2">
                   <Upload className="h-4 w-4 text-primary" />
-                  Model Resmi
+                  Model Resimleri
                 </h4>
                 <p className="text-sm text-muted-foreground leading-relaxed">
-                  Resmi <kbd className="px-2 py-0.5 bg-muted rounded text-xs font-mono">Ctrl+V</kbd> ile yapıştırın veya dosya seçin. 
-                  Excel'e aktarıldığında ilk sütunda görünecektir.
+                  Resmi <kbd className="px-2 py-0.5 bg-muted rounded text-xs font-mono">Ctrl+V</kbd> ile yapıştırın veya dosya seçin.
+                  Aynı model için <strong>10 adede kadar</strong> resim ekleyebilirsiniz. Excel'e aktarırken resimler beyaz arkaplanda
+                  <strong> yan yana</strong> birleştirilip ilk sütunda tek görsel olarak yer alır.
                 </p>
               </div>
             </div>
@@ -1142,9 +1228,9 @@ export const CostCalculator = forwardRef<HTMLDivElement, CostCalculatorProps>(fu
                       className="w-full justify-start gap-3"
                       onClick={() => handleCopyToModel(model.id)}
                     >
-                      {model.image && (
+                      {model.images.length > 0 && (
                         <div className="w-8 h-8 rounded overflow-hidden border">
-                          <img src={model.image} alt="" className="w-full h-full object-cover" />
+                          <img src={model.images[0]} alt="" className="w-full h-full object-cover" />
                         </div>
                       )}
                       <div className="flex-1 text-left">
