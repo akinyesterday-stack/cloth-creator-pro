@@ -196,7 +196,7 @@ export const ClockWeather = forwardRef<HTMLDivElement, ClockWeatherProps>(functi
 
   return (
     <>
-      <div ref={ref} className="flex items-center gap-2 sm:gap-4 flex-wrap">
+      <div ref={ref} className="flex items-center gap-2 sm:gap-4 w-full flex-wrap sm:flex-nowrap">
         {/* Clock & Date */}
         <div className="flex items-center gap-2 sm:gap-3 px-2 sm:px-4 py-2 bg-secondary/50 rounded-xl border border-border/50">
           <Clock className="h-4 w-4 sm:h-5 sm:w-5 text-primary" />
@@ -209,20 +209,6 @@ export const ClockWeather = forwardRef<HTMLDivElement, ClockWeatherProps>(functi
             </span>
           </div>
         </div>
-
-        {/* Radio Button */}
-        {onRadioToggle && (
-          <Button
-            variant={isRadioOpen ? "default" : "ghost"}
-            onClick={onRadioToggle}
-            className={`flex items-center gap-2 px-3 py-2 sm:px-4 sm:py-6 rounded-xl border border-border/50 ${
-              isRadioOpen ? "gradient-primary text-primary-foreground" : "bg-secondary/50 hover:bg-secondary/80"
-            }`}
-          >
-            <Radio className="h-4 w-4 sm:h-5 sm:w-5" />
-            <span className="text-xs sm:text-sm font-medium hidden sm:inline">Radyo</span>
-          </Button>
-        )}
 
         {/* Weather */}
         <Popover open={isOpen} onOpenChange={setIsOpen}>
@@ -268,17 +254,8 @@ export const ClockWeather = forwardRef<HTMLDivElement, ClockWeatherProps>(functi
                     className="h-9 text-sm"
                     onKeyDown={(e) => e.key === "Enter" && handleSearchLocation()}
                   />
-                  <Button
-                    size="sm"
-                    onClick={handleSearchLocation}
-                    disabled={isSearching || !manualInput.trim()}
-                    className="h-9 px-3"
-                  >
-                    {isSearching ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <Search className="h-4 w-4" />
-                    )}
+                  <Button size="sm" onClick={handleSearchLocation} disabled={isSearching || !manualInput.trim()} className="h-9 px-3">
+                    {isSearching ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
                   </Button>
                 </div>
               </div>
@@ -299,9 +276,7 @@ export const ClockWeather = forwardRef<HTMLDivElement, ClockWeatherProps>(functi
                           }}
                         >
                           <span className="truncate">{location.name}</span>
-                          {selectedLocation.name === location.name && (
-                            <Check className="h-4 w-4 text-primary flex-shrink-0" />
-                          )}
+                          {selectedLocation.name === location.name && <Check className="h-4 w-4 text-primary flex-shrink-0" />}
                         </Button>
                         <Button
                           variant="ghost"
@@ -331,9 +306,7 @@ export const ClockWeather = forwardRef<HTMLDivElement, ClockWeatherProps>(functi
                       }}
                     >
                       <span className="truncate">{location.name}</span>
-                      {selectedLocation.name === location.name && (
-                        <Check className="h-4 w-4 text-primary flex-shrink-0" />
-                      )}
+                      {selectedLocation.name === location.name && <Check className="h-4 w-4 text-primary flex-shrink-0" />}
                     </Button>
                   ))}
                 </div>
@@ -341,6 +314,20 @@ export const ClockWeather = forwardRef<HTMLDivElement, ClockWeatherProps>(functi
             </div>
           </PopoverContent>
         </Popover>
+
+        {/* Radio Button (far right) */}
+        {onRadioToggle && (
+          <Button
+            variant={isRadioOpen ? "default" : "ghost"}
+            onClick={onRadioToggle}
+            className={`ml-auto flex items-center gap-2 px-3 py-2 sm:px-4 sm:py-6 rounded-xl border border-border/50 ${
+              isRadioOpen ? "gradient-primary text-primary-foreground" : "bg-secondary/50 hover:bg-secondary/80"
+            }`}
+          >
+            <Radio className="h-4 w-4 sm:h-5 sm:w-5" />
+            <span className="text-xs sm:text-sm font-medium hidden sm:inline">Radyo</span>
+          </Button>
+        )}
       </div>
     </>
   );
