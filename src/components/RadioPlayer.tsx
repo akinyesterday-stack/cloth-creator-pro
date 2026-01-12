@@ -261,19 +261,17 @@ export const RadioPlayer = forwardRef<HTMLDivElement, RadioPlayerProps>(function
 
   if (!isOpen) return null;
 
-  const AudioEl = (
-    <audio
-      ref={audioRef}
-      onEnded={() => setIsPlaying(false)}
-      onPlay={() => setIsPlaying(true)}
-      onPause={() => setIsPlaying(false)}
-    />
-  );
+  return (
+    <>
+      <audio
+        ref={audioRef}
+        onEnded={() => setIsPlaying(false)}
+        onPlay={() => setIsPlaying(true)}
+        onPause={() => setIsPlaying(false)}
+      />
 
-  // Minimized view - small floating player
-  if (isMinimized) {
-    return (
-      <>
+      {/* Minimized view - small floating player */}
+      {isMinimized ? (
         <div
           ref={ref}
           className="fixed bottom-4 left-4 right-4 sm:left-auto sm:right-4 z-50 flex flex-col gap-3 p-4 bg-card/95 backdrop-blur-xl border border-border/50 rounded-2xl shadow-2xl animate-fade-in w-[calc(100vw-2rem)] sm:w-[340px] sm:max-w-[340px]"
@@ -309,7 +307,11 @@ export const RadioPlayer = forwardRef<HTMLDivElement, RadioPlayerProps>(function
                 className="h-8 w-8 rounded-full hover:bg-secondary flex-shrink-0"
                 title={isFavorite(currentStation) ? "Favoriden çıkar" : "Favorilere ekle"}
               >
-                <Heart className={`h-4 w-4 ${isFavorite(currentStation) ? "fill-primary text-primary" : "text-muted-foreground"}`} />
+                <Heart
+                  className={`h-4 w-4 ${
+                    isFavorite(currentStation) ? "fill-primary text-primary" : "text-muted-foreground"
+                  }`}
+                />
               </Button>
             )}
 
@@ -342,196 +344,224 @@ export const RadioPlayer = forwardRef<HTMLDivElement, RadioPlayerProps>(function
                 <Volume2 className="h-4 w-4 text-primary" />
               )}
             </Button>
-            <Slider value={[isMuted ? 0 : volume]} onValueChange={handleVolumeChange} max={100} step={1} className="flex-1" />
+            <Slider
+              value={[isMuted ? 0 : volume]}
+              onValueChange={handleVolumeChange}
+              max={100}
+              step={1}
+              className="flex-1"
+            />
             <span className="text-xs text-muted-foreground w-8 text-right">{isMuted ? 0 : volume}%</span>
           </div>
         </div>
-        {AudioEl}
-      </>
-    );
-  }
-
-  return (
-    <>
-      <div ref={ref} className="w-full mt-4 flex flex-col rounded-2xl overflow-hidden shadow-2xl border border-border/50 bg-card animate-fade-in">
-        {/* Header */}
-        <div className="flex items-center justify-between p-3 sm:p-4 border-b border-border/50 bg-gradient-to-r from-primary/10 to-transparent">
-          <div className="flex items-center gap-2 sm:gap-3">
-            <div className="p-1.5 sm:p-2 bg-primary/20 rounded-lg">
-              <Globe className="h-4 w-4 sm:h-5 sm:w-5 text-primary" />
-            </div>
-            <h2 className="text-sm sm:text-lg font-bold text-foreground">Dünya Radyo Haritası</h2>
-          </div>
-          <div className="flex items-center gap-1 sm:gap-2">
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={handleMinimize}
-              className="h-8 w-8 sm:h-9 sm:w-9 rounded-full hover:bg-secondary"
-              title="Küçült (Arka planda çalmaya devam eder)"
-            >
-              <Minimize2 className="h-4 w-4 sm:h-5 sm:w-5" />
-            </Button>
-            <Button variant="ghost" size="icon" onClick={onClose} className="h-8 w-8 sm:h-9 sm:w-9 rounded-full">
-              <X className="h-4 w-4 sm:h-5 sm:w-5" />
-            </Button>
-          </div>
-        </div>
-
-        {/* Map + Station List */}
-        <div className="flex flex-col lg:flex-row h-[400px] sm:h-[520px]">
-          <div ref={mapContainerRef} className="flex-1 min-h-[260px]" />
-
-          {/* Station List Panel */}
-          {stationList.length > 0 && (
-            <div className="w-full lg:w-72 xl:w-80 border-t lg:border-t-0 lg:border-l border-border/50 bg-background/80 backdrop-blur-sm flex flex-col max-h-[240px] lg:max-h-none">
-              <div className="p-2 sm:p-3 border-b border-border/50 flex items-center justify-between gap-2">
-                <div className="flex items-center gap-2">
-                  <List className="h-4 w-4 text-primary" />
-                  <span className="text-xs sm:text-sm font-medium">{stationList.length} İstasyon</span>
-                </div>
-                <div className="flex items-center gap-1">
-                  <Button
-                    variant={showFavoritesOnly ? "secondary" : "ghost"}
-                    size="sm"
-                    onClick={() => setShowFavoritesOnly(false)}
-                    className="h-8"
-                  >
-                    Tümü
-                  </Button>
-                  <Button
-                    variant={showFavoritesOnly ? "default" : "ghost"}
-                    size="sm"
-                    onClick={() => setShowFavoritesOnly(true)}
-                    className="h-8 gap-1"
-                  >
-                    <Heart className={`h-4 w-4 ${showFavoritesOnly ? "fill-primary-foreground" : ""}`} />
-                    <span className="hidden sm:inline">Favoriler</span>
-                  </Button>
-                </div>
+      ) : (
+        <div
+          ref={ref}
+          className="w-full mt-4 flex flex-col rounded-2xl overflow-hidden shadow-2xl border border-border/50 bg-card animate-fade-in"
+        >
+          {/* Header */}
+          <div className="flex items-center justify-between p-3 sm:p-4 border-b border-border/50 bg-gradient-to-r from-primary/10 to-transparent">
+            <div className="flex items-center gap-2 sm:gap-3">
+              <div className="p-1.5 sm:p-2 bg-primary/20 rounded-lg">
+                <Globe className="h-4 w-4 sm:h-5 sm:w-5 text-primary" />
               </div>
+              <h2 className="text-sm sm:text-lg font-bold text-foreground">Dünya Radyo Haritası</h2>
+            </div>
+            <div className="flex items-center gap-1 sm:gap-2">
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={handleMinimize}
+                className="h-8 w-8 sm:h-9 sm:w-9 rounded-full hover:bg-secondary"
+                title="Küçült (Arka planda çalmaya devam eder)"
+              >
+                <Minimize2 className="h-4 w-4 sm:h-5 sm:w-5" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={onClose}
+                className="h-8 w-8 sm:h-9 sm:w-9 rounded-full"
+              >
+                <X className="h-4 w-4 sm:h-5 sm:w-5" />
+              </Button>
+            </div>
+          </div>
 
-              <ScrollArea className="flex-1">
-                <div className="p-1 sm:p-2 space-y-1">
-                  {showFavoritesOnly && displayedStations.length === 0 ? (
-                    <div className="p-3 text-xs sm:text-sm text-muted-foreground">
-                      Bu ülke için favori istasyonunuz yok.
-                    </div>
-                  ) : (
-                    displayedStations.map((station, index) => (
-                      <div
-                        key={`${station.name}-${index}`}
-                        className={`w-full p-2 sm:p-3 rounded-lg transition-all flex items-center gap-2 ${
-                          currentStation?.name === station.name && currentStation?.url === station.url
-                            ? "bg-primary/20 border border-primary/30"
-                            : "hover:bg-secondary/50"
-                        }`}
-                      >
-                        <button onClick={() => playStation(station)} className="flex items-center gap-2 min-w-0 flex-1 text-left">
-                          {station.favicon ? (
-                            <img
-                              src={station.favicon}
-                              alt=""
-                              className="w-6 h-6 sm:w-8 sm:h-8 rounded object-cover flex-shrink-0"
-                              onError={(e) => {
-                                (e.target as HTMLImageElement).style.display = "none";
-                              }}
-                            />
-                          ) : (
-                            <div className="w-6 h-6 sm:w-8 sm:h-8 rounded bg-primary/20 flex items-center justify-center flex-shrink-0">
-                              <Radio className="h-3 w-3 sm:h-4 sm:w-4 text-primary" />
-                            </div>
-                          )}
+          {/* Map + Station List */}
+          <div className="flex flex-col lg:flex-row h-[400px] sm:h-[520px]">
+            <div ref={mapContainerRef} className="flex-1 min-h-[260px]" />
 
-                          <div className="min-w-0 flex-1">
-                            <p className="text-xs sm:text-sm font-medium truncate">{station.name}</p>
-                            {station.tags && <p className="text-xs text-muted-foreground truncate">{station.tags.split(",").slice(0, 2).join(", ")}</p>}
-                          </div>
+            {/* Station List Panel */}
+            {stationList.length > 0 && (
+              <div className="w-full lg:w-72 xl:w-80 border-t lg:border-t-0 lg:border-l border-border/50 bg-background/80 backdrop-blur-sm flex flex-col max-h-[240px] lg:max-h-none">
+                <div className="p-2 sm:p-3 border-b border-border/50 flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <List className="h-4 w-4 text-primary" />
+                    <span className="text-xs sm:text-sm font-medium">{stationList.length} İstasyon</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <Button
+                      variant={showFavoritesOnly ? "secondary" : "ghost"}
+                      size="sm"
+                      onClick={() => setShowFavoritesOnly(false)}
+                      className="h-8"
+                    >
+                      Tümü
+                    </Button>
+                    <Button
+                      variant={showFavoritesOnly ? "default" : "ghost"}
+                      size="sm"
+                      onClick={() => setShowFavoritesOnly(true)}
+                      className="h-8 gap-1"
+                    >
+                      <Heart className={`h-4 w-4 ${showFavoritesOnly ? "fill-primary-foreground" : ""}`} />
+                      <span className="hidden sm:inline">Favoriler</span>
+                    </Button>
+                  </div>
+                </div>
 
-                          {currentStation?.name === station.name && currentStation?.url === station.url && isPlaying && (
-                            <Volume2 className="h-3 w-3 sm:h-4 sm:w-4 text-primary animate-pulse flex-shrink-0" />
-                          )}
-                        </button>
-
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => toggleFavorite(station)}
-                          className="h-8 w-8 rounded-full"
-                          title={isFavorite(station) ? "Favoriden çıkar" : "Favorilere ekle"}
-                        >
-                          <Heart className={`h-4 w-4 ${isFavorite(station) ? "fill-primary text-primary" : "text-muted-foreground"}`} />
-                        </Button>
+                <ScrollArea className="flex-1">
+                  <div className="p-1 sm:p-2 space-y-1">
+                    {showFavoritesOnly && displayedStations.length === 0 ? (
+                      <div className="p-3 text-xs sm:text-sm text-muted-foreground">
+                        Bu ülke için favori istasyonunuz yok.
                       </div>
-                    ))
-                  )}
-                </div>
-              </ScrollArea>
-            </div>
-          )}
-        </div>
+                    ) : (
+                      displayedStations.map((station, index) => (
+                        <div
+                          key={`${station.name}-${index}`}
+                          className={`w-full p-2 sm:p-3 rounded-lg transition-all flex items-center gap-2 ${
+                            currentStation?.name === station.name && currentStation?.url === station.url
+                              ? "bg-primary/20 border border-primary/30"
+                              : "hover:bg-secondary/50"
+                          }`}
+                        >
+                          <button
+                            onClick={() => playStation(station)}
+                            className="flex items-center gap-2 min-w-0 flex-1 text-left"
+                          >
+                            {station.favicon ? (
+                              <img
+                                src={station.favicon}
+                                alt=""
+                                className="w-6 h-6 sm:w-8 sm:h-8 rounded object-cover flex-shrink-0"
+                                onError={(e) => {
+                                  (e.target as HTMLImageElement).style.display = "none";
+                                }}
+                              />
+                            ) : (
+                              <div className="w-6 h-6 sm:w-8 sm:h-8 rounded bg-primary/20 flex items-center justify-center flex-shrink-0">
+                                <Radio className="h-3 w-3 sm:h-4 sm:w-4 text-primary" />
+                              </div>
+                            )}
 
-        {/* Glass Player Panel with Volume */}
-        <div className="p-3 sm:p-4 lg:p-6 bg-background/60 backdrop-blur-xl border-t border-border/30">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4 lg:gap-6">
-            {/* Play Button */}
-            <Button
-              onClick={togglePlay}
-              disabled={!currentStation || isLoading}
-              size="lg"
-              className="h-12 w-12 sm:h-14 sm:w-14 rounded-full gradient-primary shadow-lg hover:shadow-xl transition-all hover:scale-105 flex-shrink-0"
-            >
-              {isLoading ? (
-                <div className="h-4 w-4 sm:h-5 sm:w-5 border-2 border-primary-foreground border-t-transparent rounded-full animate-spin" />
-              ) : isPlaying ? (
-                <Pause className="h-5 w-5 sm:h-6 sm:w-6" />
-              ) : (
-                <Play className="h-5 w-5 sm:h-6 sm:w-6 ml-1" />
-              )}
-            </Button>
+                            <div className="min-w-0 flex-1">
+                              <p className="text-xs sm:text-sm font-medium truncate">{station.name}</p>
+                              {station.tags && (
+                                <p className="text-xs text-muted-foreground truncate">
+                                  {station.tags.split(",").slice(0, 2).join(", ")}
+                                </p>
+                              )}
+                            </div>
 
-            {/* Station Info */}
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 mb-1">
-                <Radio className="h-3 w-3 sm:h-4 sm:w-4 text-primary flex-shrink-0" />
-                <p className="font-bold text-sm sm:text-base text-foreground truncate">
-                  {currentStation?.name || "İstasyon Seçilmedi"}
-                </p>
-                {currentStation && (
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => toggleFavorite(currentStation)}
-                    className="h-8 w-8 rounded-full"
-                    title={isFavorite(currentStation) ? "Favoriden çıkar" : "Favorilere ekle"}
-                  >
-                    <Heart className={`h-4 w-4 ${isFavorite(currentStation) ? "fill-primary text-primary" : "text-muted-foreground"}`} />
-                  </Button>
-                )}
+                            {currentStation?.name === station.name &&
+                              currentStation?.url === station.url &&
+                              isPlaying && <Volume2 className="h-3 w-3 sm:h-4 sm:w-4 text-primary animate-pulse flex-shrink-0" />}
+                          </button>
+
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => toggleFavorite(station)}
+                            className="h-8 w-8 rounded-full"
+                            title={isFavorite(station) ? "Favoriden çıkar" : "Favorilere ekle"}
+                          >
+                            <Heart
+                              className={`h-4 w-4 ${
+                                isFavorite(station) ? "fill-primary text-primary" : "text-muted-foreground"
+                              }`}
+                            />
+                          </Button>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </ScrollArea>
               </div>
-              <div className="flex items-center gap-2 text-xs sm:text-sm text-muted-foreground">
-                <MapPin className="h-3 w-3 flex-shrink-0" />
-                <span className="truncate">{status}</span>
-              </div>
-            </div>
+            )}
+          </div>
 
-            {/* Volume Control */}
-            <div className="flex items-center gap-2 w-full sm:w-auto sm:min-w-[140px] lg:min-w-[180px]">
-              <Button variant="ghost" size="icon" onClick={toggleMute} className="h-8 w-8 rounded-full flex-shrink-0">
-                {isMuted || volume === 0 ? (
-                  <VolumeX className="h-4 w-4 text-muted-foreground" />
+          {/* Glass Player Panel with Volume */}
+          <div className="p-3 sm:p-4 lg:p-6 bg-background/60 backdrop-blur-xl border-t border-border/30">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4 lg:gap-6">
+              {/* Play Button */}
+              <Button
+                onClick={togglePlay}
+                disabled={!currentStation || isLoading}
+                size="lg"
+                className="h-12 w-12 sm:h-14 sm:w-14 rounded-full gradient-primary shadow-lg hover:shadow-xl transition-all hover:scale-105 flex-shrink-0"
+              >
+                {isLoading ? (
+                  <div className="h-4 w-4 sm:h-5 sm:w-5 border-2 border-primary-foreground border-t-transparent rounded-full animate-spin" />
+                ) : isPlaying ? (
+                  <Pause className="h-5 w-5 sm:h-6 sm:w-6" />
                 ) : (
-                  <Volume2 className="h-4 w-4 text-primary" />
+                  <Play className="h-5 w-5 sm:h-6 sm:w-6 ml-1" />
                 )}
               </Button>
-              <Slider value={[isMuted ? 0 : volume]} onValueChange={handleVolumeChange} max={100} step={1} className="flex-1" />
-              <span className="text-xs text-muted-foreground w-8 text-right flex-shrink-0">{isMuted ? 0 : volume}%</span>
+
+              {/* Station Info */}
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 mb-1">
+                  <Radio className="h-3 w-3 sm:h-4 sm:w-4 text-primary flex-shrink-0" />
+                  <p className="font-bold text-sm sm:text-base text-foreground truncate">
+                    {currentStation?.name || "İstasyon Seçilmedi"}
+                  </p>
+                  {currentStation && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => toggleFavorite(currentStation)}
+                      className="h-8 w-8 rounded-full"
+                      title={isFavorite(currentStation) ? "Favoriden çıkar" : "Favorilere ekle"}
+                    >
+                      <Heart
+                        className={`h-4 w-4 ${
+                          isFavorite(currentStation) ? "fill-primary text-primary" : "text-muted-foreground"
+                        }`}
+                      />
+                    </Button>
+                  )}
+                </div>
+                <div className="flex items-center gap-2 text-xs sm:text-sm text-muted-foreground">
+                  <MapPin className="h-3 w-3 flex-shrink-0" />
+                  <span className="truncate">{status}</span>
+                </div>
+              </div>
+
+              {/* Volume Control */}
+              <div className="flex items-center gap-2 w-full sm:w-auto sm:min-w-[140px] lg:min-w-[180px]">
+                <Button variant="ghost" size="icon" onClick={toggleMute} className="h-8 w-8 rounded-full flex-shrink-0">
+                  {isMuted || volume === 0 ? (
+                    <VolumeX className="h-4 w-4 text-muted-foreground" />
+                  ) : (
+                    <Volume2 className="h-4 w-4 text-primary" />
+                  )}
+                </Button>
+                <Slider
+                  value={[isMuted ? 0 : volume]}
+                  onValueChange={handleVolumeChange}
+                  max={100}
+                  step={1}
+                  className="flex-1"
+                />
+                <span className="text-xs text-muted-foreground w-8 text-right flex-shrink-0">{isMuted ? 0 : volume}%</span>
+              </div>
             </div>
           </div>
         </div>
-      </div>
-
-      {AudioEl}
+      )}
     </>
   );
 });
