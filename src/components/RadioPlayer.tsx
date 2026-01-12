@@ -11,10 +11,14 @@ import {
   Minimize2,
   List,
   Heart,
+  Search,
+  SkipForward,
+  AlertCircle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Slider } from "@/components/ui/slider";
+import { Input } from "@/components/ui/input";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 
@@ -59,6 +63,8 @@ export const RadioPlayer = forwardRef<HTMLDivElement, RadioPlayerProps>(function
   const [stationList, setStationList] = useState<Station[]>([]);
   const [volume, setVolume] = useState(80);
   const [isMuted, setIsMuted] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [stationError, setStationError] = useState<string | null>(null);
 
   // Favorites
   const [favorites, setFavorites] = useState<FavoriteStation[]>([]);
@@ -90,9 +96,25 @@ export const RadioPlayer = forwardRef<HTMLDivElement, RadioPlayerProps>(function
   }, [favorites]);
 
   const displayedStations = useMemo(() => {
-    if (!showFavoritesOnly) return stationList;
-    return stationList.filter((s) => favoritesSet.has(stationKey(s)));
-  }, [showFavoritesOnly, stationList, favoritesSet]);
+    let filtered = stationList;
+    
+    // Apply search filter
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      filtered = filtered.filter(
+        (s) =>
+          s.name.toLowerCase().includes(query) ||
+          s.tags?.toLowerCase().includes(query)
+      );
+    }
+    
+    // Apply favorites filter
+    if (showFavoritesOnly) {
+      filtered = filtered.filter((s) => favoritesSet.has(stationKey(s)));
+    }
+    
+    return filtered;
+  }, [showFavoritesOnly, stationList, favoritesSet, searchQuery]);
 
   const isFavorite = (station: FavoriteStation) => favoritesSet.has(stationKey(station));
 
@@ -130,6 +152,8 @@ export const RadioPlayer = forwardRef<HTMLDivElement, RadioPlayerProps>(function
       setIsLoading(true);
       setStatus("İstasyonlar aranıyor...");
       setStationList([]);
+      setSearchQuery("");
+      setStationError(null);
 
       try {
         // First, get country from coordinates using reverse geocoding
@@ -146,6 +170,7 @@ export const RadioPlayer = forwardRef<HTMLDivElement, RadioPlayerProps>(function
         }
 
         // Fetch stations by country code - try multiple API servers for better results
+        // Use lastcheckok=1 to get only working stations with verified URLs
         const apiServers = ["de1.api.radio-browser.info", "nl1.api.radio-browser.info", "at1.api.radio-browser.info"];
 
         let stations: Station[] = [];
@@ -153,19 +178,19 @@ export const RadioPlayer = forwardRef<HTMLDivElement, RadioPlayerProps>(function
         for (const server of apiServers) {
           try {
             const response = await fetch(
-              `https://${server}/json/stations/bycountrycodeexact/${countryCode}?hidebroken=true&order=clickcount&reverse=true&limit=100`
+              `https://${server}/json/stations/bycountrycodeexact/${countryCode}?hidebroken=true&lastcheckok=1&order=clickcount&reverse=true&limit=150`
             );
             const data: Station[] = await response.json();
             if (data && data.length > stations.length) {
               stations = data;
             }
-            if (stations.length >= 30) break; // Good enough
+            if (stations.length >= 50) break; // Good enough
           } catch (e) {
             console.log(`Server ${server} failed, trying next...`);
           }
         }
 
-        // Filter stations with valid URLs
+        // Filter stations with valid URLs (prefer url_resolved which is the actual working URL)
         const validStations = stations.filter((s) => s.url_resolved || s.url);
 
         if (validStations.length > 0) {
@@ -201,6 +226,7 @@ export const RadioPlayer = forwardRef<HTMLDivElement, RadioPlayerProps>(function
   const playStation = (station: Station) => {
     setCurrentStation(station);
     setStatus(`Şu an çalıyor: ${station.country || "Bilinmeyen Ülke"}`);
+    setStationError(null);
 
     // Update marker
     if (mapRef.current) {
@@ -221,12 +247,28 @@ export const RadioPlayer = forwardRef<HTMLDivElement, RadioPlayerProps>(function
       audioRef.current.src = station.url_resolved || station.url;
       audioRef.current
         .play()
-        .then(() => setIsPlaying(true))
+        .then(() => {
+          setIsPlaying(true);
+          setStationError(null);
+        })
         .catch((err) => {
           console.error(err);
           setIsPlaying(false);
+          setStationError("Bu istasyon şu anda çalışmıyor");
         });
     }
+  };
+
+  // Skip to next working station
+  const skipToNextStation = () => {
+    if (!currentStation || stationList.length === 0) return;
+    
+    const currentIndex = stationList.findIndex(
+      (s) => s.name === currentStation.name && s.url === currentStation.url
+    );
+    
+    const nextIndex = (currentIndex + 1) % stationList.length;
+    playStation(stationList[nextIndex]);
   };
 
   const togglePlay = () => {
@@ -395,37 +437,51 @@ export const RadioPlayer = forwardRef<HTMLDivElement, RadioPlayerProps>(function
             {/* Station List Panel */}
             {stationList.length > 0 && (
               <div className="w-full lg:w-72 xl:w-80 border-t lg:border-t-0 lg:border-l border-border/50 bg-background/80 backdrop-blur-sm flex flex-col max-h-[240px] lg:max-h-none">
-                <div className="p-2 sm:p-3 border-b border-border/50 flex items-center justify-between gap-2">
-                  <div className="flex items-center gap-2">
-                    <List className="h-4 w-4 text-primary" />
-                    <span className="text-xs sm:text-sm font-medium">{stationList.length} İstasyon</span>
+                <div className="p-2 sm:p-3 border-b border-border/50 space-y-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <List className="h-4 w-4 text-primary" />
+                      <span className="text-xs sm:text-sm font-medium">{displayedStations.length}/{stationList.length} İstasyon</span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <Button
+                        variant={showFavoritesOnly ? "secondary" : "ghost"}
+                        size="sm"
+                        onClick={() => setShowFavoritesOnly(false)}
+                        className="h-8"
+                      >
+                        Tümü
+                      </Button>
+                      <Button
+                        variant={showFavoritesOnly ? "default" : "ghost"}
+                        size="sm"
+                        onClick={() => setShowFavoritesOnly(true)}
+                        className="h-8 gap-1"
+                      >
+                        <Heart className={`h-4 w-4 ${showFavoritesOnly ? "fill-primary-foreground" : ""}`} />
+                        <span className="hidden sm:inline">Favoriler</span>
+                      </Button>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-1">
-                    <Button
-                      variant={showFavoritesOnly ? "secondary" : "ghost"}
-                      size="sm"
-                      onClick={() => setShowFavoritesOnly(false)}
-                      className="h-8"
-                    >
-                      Tümü
-                    </Button>
-                    <Button
-                      variant={showFavoritesOnly ? "default" : "ghost"}
-                      size="sm"
-                      onClick={() => setShowFavoritesOnly(true)}
-                      className="h-8 gap-1"
-                    >
-                      <Heart className={`h-4 w-4 ${showFavoritesOnly ? "fill-primary-foreground" : ""}`} />
-                      <span className="hidden sm:inline">Favoriler</span>
-                    </Button>
+                  
+                  {/* Search Input */}
+                  <div className="relative">
+                    <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      type="text"
+                      placeholder="İstasyon ara..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="h-8 pl-8 text-sm"
+                    />
                   </div>
                 </div>
 
                 <ScrollArea className="flex-1">
                   <div className="p-1 sm:p-2 space-y-1">
-                    {showFavoritesOnly && displayedStations.length === 0 ? (
+                    {displayedStations.length === 0 ? (
                       <div className="p-3 text-xs sm:text-sm text-muted-foreground">
-                        Bu ülke için favori istasyonunuz yok.
+                        {searchQuery ? "Arama sonucu bulunamadı." : "Bu ülke için favori istasyonunuz yok."}
                       </div>
                     ) : (
                       displayedStations.map((station, index) => (
@@ -496,20 +552,34 @@ export const RadioPlayer = forwardRef<HTMLDivElement, RadioPlayerProps>(function
           <div className="p-3 sm:p-4 lg:p-6 bg-background/60 backdrop-blur-xl border-t border-border/30">
             <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4 lg:gap-6">
               {/* Play Button */}
-              <Button
-                onClick={togglePlay}
-                disabled={!currentStation || isLoading}
-                size="lg"
-                className="h-12 w-12 sm:h-14 sm:w-14 rounded-full gradient-primary shadow-lg hover:shadow-xl transition-all hover:scale-105 flex-shrink-0"
-              >
-                {isLoading ? (
-                  <div className="h-4 w-4 sm:h-5 sm:w-5 border-2 border-primary-foreground border-t-transparent rounded-full animate-spin" />
-                ) : isPlaying ? (
-                  <Pause className="h-5 w-5 sm:h-6 sm:w-6" />
-                ) : (
-                  <Play className="h-5 w-5 sm:h-6 sm:w-6 ml-1" />
-                )}
-              </Button>
+              <div className="flex items-center gap-2">
+                <Button
+                  onClick={togglePlay}
+                  disabled={!currentStation || isLoading}
+                  size="lg"
+                  className="h-12 w-12 sm:h-14 sm:w-14 rounded-full gradient-primary shadow-lg hover:shadow-xl transition-all hover:scale-105 flex-shrink-0"
+                >
+                  {isLoading ? (
+                    <div className="h-4 w-4 sm:h-5 sm:w-5 border-2 border-primary-foreground border-t-transparent rounded-full animate-spin" />
+                  ) : isPlaying ? (
+                    <Pause className="h-5 w-5 sm:h-6 sm:w-6" />
+                  ) : (
+                    <Play className="h-5 w-5 sm:h-6 sm:w-6 ml-1" />
+                  )}
+                </Button>
+                
+                {/* Skip to next station */}
+                <Button
+                  onClick={skipToNextStation}
+                  disabled={!currentStation || stationList.length <= 1}
+                  variant="ghost"
+                  size="icon"
+                  className="h-10 w-10 sm:h-12 sm:w-12 rounded-full"
+                  title="Sonraki istasyon"
+                >
+                  <SkipForward className="h-4 w-4 sm:h-5 sm:w-5" />
+                </Button>
+              </div>
 
               {/* Station Info */}
               <div className="flex-1 min-w-0">
@@ -534,9 +604,18 @@ export const RadioPlayer = forwardRef<HTMLDivElement, RadioPlayerProps>(function
                     </Button>
                   )}
                 </div>
-                <div className="flex items-center gap-2 text-xs sm:text-sm text-muted-foreground">
-                  <MapPin className="h-3 w-3 flex-shrink-0" />
-                  <span className="truncate">{status}</span>
+                <div className="flex items-center gap-2 text-xs sm:text-sm">
+                  {stationError ? (
+                    <span className="flex items-center gap-1 text-destructive">
+                      <AlertCircle className="h-3 w-3" />
+                      {stationError}
+                    </span>
+                  ) : (
+                    <>
+                      <MapPin className="h-3 w-3 flex-shrink-0 text-muted-foreground" />
+                      <span className="truncate text-muted-foreground">{status}</span>
+                    </>
+                  )}
                 </div>
               </div>
 
