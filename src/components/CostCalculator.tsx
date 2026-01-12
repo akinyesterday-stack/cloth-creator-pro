@@ -858,21 +858,11 @@ export const CostCalculator = forwardRef<HTMLDivElement, CostCalculatorProps>(fu
       </Card>
 
       {/* Radio Player - opened from ClockWeather button */}
-      {isRadioOpen && !isRadioMinimized && (
+      {isRadioOpen && (
         <RadioPlayer
           isOpen={isRadioOpen}
           onClose={() => onRadioClose?.()}
-          isMinimized={false}
-          onMinimize={() => onRadioMinimize?.()}
-        />
-      )}
-      
-      {/* Minimized Radio Player - floating at bottom right */}
-      {isRadioOpen && isRadioMinimized && (
-        <RadioPlayer
-          isOpen={isRadioOpen}
-          onClose={() => onRadioClose?.()}
-          isMinimized={true}
+          isMinimized={isRadioMinimized}
           onMinimize={() => onRadioMinimize?.()}
         />
       )}
