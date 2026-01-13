@@ -1,4 +1,4 @@
-import { Scissors, User, LogOut, Shield, DollarSign } from "lucide-react";
+import { Scissors, User, LogOut, Shield, DollarSign, Archive } from "lucide-react";
 import { ClockWeather } from "./ClockWeather";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
@@ -81,6 +81,10 @@ export function Header({ onRadioToggle, isRadioOpen = false }: HeaderProps) {
                   <DropdownMenuItem onClick={() => navigate("/fabric-prices")} className="cursor-pointer">
                     <DollarSign className="h-4 w-4 mr-2" />
                     Kalite Fiyatları
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => navigate("/saved-costs")} className="cursor-pointer">
+                    <Archive className="h-4 w-4 mr-2" />
+                    Kayıtlı Maliyetler
                   </DropdownMenuItem>
                   {isAdmin && (
                     <>

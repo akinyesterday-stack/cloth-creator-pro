@@ -80,6 +80,39 @@ export type Database = {
         }
         Relationships: []
       }
+      saved_costs: {
+        Row: {
+          created_at: string
+          id: string
+          images: string[] | null
+          items: Json
+          model_name: string
+          total_cost: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          images?: string[] | null
+          items?: Json
+          model_name: string
+          total_cost?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          images?: string[] | null
+          items?: Json
+          model_name?: string
+          total_cost?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       saved_locations: {
         Row: {
           created_at: string

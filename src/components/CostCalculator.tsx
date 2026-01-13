@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { SearchableCombobox } from "@/components/SearchableCombobox";
 import { FabricManager, FabricTypeWithSpec } from "@/components/FabricManager";
 import { fabricTypesWithSpecs as defaultFabricTypes, usageAreas as defaultUsageAreas } from "@/data/fabricData";
-import { Calculator, Plus, Trash2, FileSpreadsheet, Package, Image, Upload, X, Pencil, Check, Settings, Download, Loader2, Copy, Send } from "lucide-react";
+import { Calculator, Plus, Trash2, FileSpreadsheet, Package, Image, Upload, X, Pencil, Check, Settings, Download, Loader2, Copy, Send, Save } from "lucide-react";
 import { RadioPlayer } from "@/components/RadioPlayer";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -91,29 +91,20 @@ export const CostCalculator = forwardRef<HTMLDivElement, CostCalculatorProps>(fu
     const loadUserData = async () => {
       setIsLoadingData(true);
       try {
-        // Load fabric types
-        const { data: fabricData, error: fabricError } = await supabase
-          .from("user_fabric_types")
-          .select("*")
-          .eq("user_id", user.id);
+        // Load all data in parallel for faster loading
+        const [fabricResult, usageResult, priceResult] = await Promise.all([
+          supabase.from("user_fabric_types").select("*").eq("user_id", user.id),
+          supabase.from("user_usage_areas").select("*").eq("user_id", user.id),
+          supabase.from("fabric_prices").select("fabric_name, en, gramaj, fiyat").eq("user_id", user.id)
+        ]);
 
-        if (fabricError) throw fabricError;
+        if (fabricResult.error) throw fabricResult.error;
+        if (usageResult.error) throw usageResult.error;
+        if (priceResult.error) throw priceResult.error;
 
-        // Load usage areas
-        const { data: usageData, error: usageError } = await supabase
-          .from("user_usage_areas")
-          .select("*")
-          .eq("user_id", user.id);
-
-        if (usageError) throw usageError;
-
-        // Load fabric prices
-        const { data: priceData, error: priceError } = await supabase
-          .from("fabric_prices")
-          .select("fabric_name, en, gramaj, fiyat")
-          .eq("user_id", user.id);
-
-        if (priceError) throw priceError;
+        const fabricData = fabricResult.data;
+        const usageData = usageResult.data;
+        const priceData = priceResult.data;
         
         if (priceData) {
           setFabricPrices(priceData.map(p => ({
@@ -128,9 +119,9 @@ export const CostCalculator = forwardRef<HTMLDivElement, CostCalculatorProps>(fu
         if (!fabricData || fabricData.length === 0) {
           setFabricTypes(defaultFabricTypes);
           setUsageAreas(defaultUsageAreas);
-          // Save defaults to database
-          await saveFabricTypes(defaultFabricTypes);
-          await saveUsageAreas(defaultUsageAreas);
+          // Save defaults to database in background
+          saveFabricTypes(defaultFabricTypes);
+          saveUsageAreas(defaultUsageAreas);
           setHasLoadedFromSystem(true);
         } else {
           setFabricTypes(fabricData.map(f => ({ name: f.name, en: f.en, gramaj: f.gramaj })));
@@ -142,7 +133,7 @@ export const CostCalculator = forwardRef<HTMLDivElement, CostCalculatorProps>(fu
         } else if (!usageData || usageData.length === 0) {
           // If no usage areas exist, load defaults
           setUsageAreas(defaultUsageAreas);
-          await saveUsageAreas(defaultUsageAreas);
+          saveUsageAreas(defaultUsageAreas);
         }
       } catch (error) {
         console.error("Error loading user data:", error);
@@ -462,6 +453,42 @@ export const CostCalculator = forwardRef<HTMLDivElement, CostCalculatorProps>(fu
     );
   };
 
+  // Save all models to database
+  const handleSaveAllCosts = async () => {
+    if (!user) {
+      toast.error("Kaydetmek için giriş yapmalısınız");
+      return;
+    }
+
+    const modelsWithItems = models.filter(m => m.items.length > 0);
+    if (modelsWithItems.length === 0) {
+      toast.error("Kaydedilecek maliyet bulunamadı");
+      return;
+    }
+
+    try {
+      const savePromises = modelsWithItems.map(async (model) => {
+        const totalCost = model.items.reduce((sum, item) => sum + item.fiyat, 0);
+        
+        const { error } = await supabase.from("saved_costs").insert([{
+          user_id: user.id,
+          model_name: model.modelName,
+          items: JSON.parse(JSON.stringify(model.items)),
+          images: model.images,
+          total_cost: totalCost,
+        }]);
+
+        if (error) throw error;
+      });
+
+      await Promise.all(savePromises);
+      toast.success(`${modelsWithItems.length} model kaydedildi`);
+    } catch (error) {
+      console.error("Error saving costs:", error);
+      toast.error("Kaydetme sırasında hata oluştu");
+    }
+  };
+
   const handleExportExcel = async () => {
     const workbook = new ExcelJS.Workbook();
     workbook.creator = 'Maliyet Hesaplayıcı';
@@ -687,14 +714,20 @@ export const CostCalculator = forwardRef<HTMLDivElement, CostCalculatorProps>(fu
 
   return (
     <div ref={ref} className="space-y-8 animate-fade-in" onPaste={handleImagePaste}>
-      {/* Loading or Empty State */}
+      {/* Loading State - Skeleton */}
       {isLoadingData ? (
-        <Card className="border-none shadow-2xl overflow-hidden">
-          <CardContent className="p-12 flex flex-col items-center justify-center">
-            <Loader2 className="h-8 w-8 animate-spin text-primary mb-4" />
-            <p className="text-muted-foreground">Veriler yükleniyor...</p>
-          </CardContent>
-        </Card>
+        <div className="space-y-4 animate-pulse">
+          <div className="flex gap-4">
+            <div className="h-12 w-64 bg-muted rounded-lg"></div>
+          </div>
+          <Card className="border-none shadow-xl">
+            <CardHeader className="bg-muted h-16 rounded-t-lg"></CardHeader>
+            <CardContent className="p-6 space-y-4">
+              <div className="h-10 bg-muted rounded w-3/4"></div>
+              <div className="h-10 bg-muted rounded w-1/2"></div>
+            </CardContent>
+          </Card>
+        </div>
       ) : !hasLoadedFromSystem && fabricTypes.length === 0 ? (
         <Card className="border-none shadow-2xl overflow-hidden bg-gradient-to-br from-card via-card to-primary/5">
           <CardContent className="p-12 flex flex-col items-center justify-center">
@@ -1167,7 +1200,7 @@ export const CostCalculator = forwardRef<HTMLDivElement, CostCalculatorProps>(fu
         </Card>
       )}
 
-      {/* Export Button */}
+      {/* Export and Save Buttons */}
       {models.length > 0 && models.some(m => m.items.length > 0) && (
         <Card className="border-none shadow-2xl animate-fade-in overflow-hidden bg-gradient-to-br from-card to-primary/5">
           <CardContent className="p-8">
@@ -1179,14 +1212,25 @@ export const CostCalculator = forwardRef<HTMLDivElement, CostCalculatorProps>(fu
                   {models.reduce((sum, m) => sum + m.items.length, 0)} kalem kumaş
                 </p>
               </div>
-              <Button 
-                onClick={handleExportExcel} 
-                size="lg"
-                className="gradient-primary hover:opacity-90 shadow-xl hover:shadow-2xl transition-all duration-300 hover:scale-105 px-10"
-              >
-                <FileSpreadsheet className="h-5 w-5 mr-3" />
-                Excel İndir
-              </Button>
+              <div className="flex gap-3 flex-wrap justify-center">
+                <Button 
+                  onClick={handleSaveAllCosts}
+                  size="lg"
+                  variant="outline"
+                  className="shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 px-8"
+                >
+                  <Save className="h-5 w-5 mr-3" />
+                  Tümünü Kaydet
+                </Button>
+                <Button 
+                  onClick={handleExportExcel} 
+                  size="lg"
+                  className="gradient-primary hover:opacity-90 shadow-xl hover:shadow-2xl transition-all duration-300 hover:scale-105 px-10"
+                >
+                  <FileSpreadsheet className="h-5 w-5 mr-3" />
+                  Excel İndir
+                </Button>
+              </div>
             </div>
           </CardContent>
         </Card>
