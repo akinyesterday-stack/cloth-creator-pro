@@ -6,7 +6,8 @@ import { Button } from "@/components/ui/button";
 import { SearchableCombobox } from "@/components/SearchableCombobox";
 import { FabricManager, FabricTypeWithSpec } from "@/components/FabricManager";
 import { fabricTypesWithSpecs as defaultFabricTypes, usageAreas as defaultUsageAreas } from "@/data/fabricData";
-import { Calculator, Plus, Trash2, FileSpreadsheet, Package, Image, Upload, X, Pencil, Check, Settings, Download, Loader2, Copy, Send, Save } from "lucide-react";
+import { Calculator, Plus, Trash2, FileSpreadsheet, Package, Image, Upload, X, Pencil, Check, Settings, Download, Loader2, Copy, Send, Save, Archive } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import { RadioPlayer } from "@/components/RadioPlayer";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -50,6 +51,7 @@ export const CostCalculator = forwardRef<HTMLDivElement, CostCalculatorProps>(fu
   ref
 ) {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [models, setModels] = useState<ModelGroup[]>([]);
   const [currentModelName, setCurrentModelName] = useState("");
   const [activeModelId, setActiveModelId] = useState<string | null>(null);
@@ -751,7 +753,7 @@ export const CostCalculator = forwardRef<HTMLDivElement, CostCalculatorProps>(fu
       ) : (
         <>
           {/* Top Controls */}
-          <div className="flex flex-wrap items-start justify-between gap-4">
+          <div className="flex flex-wrap items-start gap-4">
             {/* Settings Button */}
             <Button
               variant={showManager ? "default" : "outline"}
@@ -760,6 +762,16 @@ export const CostCalculator = forwardRef<HTMLDivElement, CostCalculatorProps>(fu
             >
               <Settings className="h-4 w-4" />
               {showManager ? "Yönetimi Kapat" : "Kumaş & Kullanım Yeri Yönetimi"}
+            </Button>
+            
+            {/* Saved Costs Button */}
+            <Button
+              variant="outline"
+              onClick={() => navigate("/saved-costs")}
+              className="gap-2 h-12"
+            >
+              <Archive className="h-4 w-4" />
+              Kayıtlı Maliyetler
             </Button>
           </div>
 
