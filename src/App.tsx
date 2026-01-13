@@ -8,6 +8,7 @@ import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import Admin from "./pages/Admin";
 import FabricPrices from "./pages/FabricPrices";
+import SavedCosts from "./pages/SavedCosts";
 import NotFound from "./pages/NotFound";
 import { Loader2 } from "lucide-react";
 
@@ -60,6 +61,14 @@ function AppRoutes() {
         element={
           <ProtectedRoute>
             <FabricPrices />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/saved-costs"
+        element={
+          <ProtectedRoute>
+            <SavedCosts />
           </ProtectedRoute>
         }
       />
