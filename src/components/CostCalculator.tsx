@@ -455,41 +455,56 @@ export const CostCalculator = forwardRef<HTMLDivElement, CostCalculatorProps>(fu
     );
   };
 
-  // Save all models to database
-  const handleSaveAllCosts = async () => {
-    if (!user) {
-      toast.error("Kaydetmek için giriş yapmalısınız");
-      return;
-    }
-
-    const modelsWithItems = models.filter(m => m.items.length > 0);
-    if (modelsWithItems.length === 0) {
-      toast.error("Kaydedilecek maliyet bulunamadı");
-      return;
-    }
+  // Auto-save a single model to database (upsert by model name)
+  const autoSaveModel = useCallback(async (model: ModelGroup) => {
+    if (!user || model.items.length === 0) return;
 
     try {
-      const savePromises = modelsWithItems.map(async (model) => {
-        const totalCost = model.items.reduce((sum, item) => sum + item.fiyat, 0);
-        
-        const { error } = await supabase.from("saved_costs").insert([{
+      const totalCost = model.items.reduce((sum, item) => sum + item.fiyat, 0);
+      
+      // Check if model with same name exists
+      const { data: existing } = await supabase
+        .from("saved_costs")
+        .select("id")
+        .eq("user_id", user.id)
+        .eq("model_name", model.modelName)
+        .maybeSingle();
+
+      if (existing) {
+        // Update existing
+        await supabase.from("saved_costs").update({
+          items: JSON.parse(JSON.stringify(model.items)),
+          images: model.images,
+          total_cost: totalCost,
+        }).eq("id", existing.id);
+      } else {
+        // Insert new
+        await supabase.from("saved_costs").insert([{
           user_id: user.id,
           model_name: model.modelName,
           items: JSON.parse(JSON.stringify(model.items)),
           images: model.images,
           total_cost: totalCost,
         }]);
-
-        if (error) throw error;
-      });
-
-      await Promise.all(savePromises);
-      toast.success(`${modelsWithItems.length} model kaydedildi`);
+      }
     } catch (error) {
-      console.error("Error saving costs:", error);
-      toast.error("Kaydetme sırasında hata oluştu");
+      console.error("Auto-save error:", error);
     }
-  };
+  }, [user]);
+
+  // Debounced auto-save effect
+  useEffect(() => {
+    if (!user) return;
+    
+    const modelsWithItems = models.filter(m => m.items.length > 0);
+    if (modelsWithItems.length === 0) return;
+
+    const timeoutId = setTimeout(() => {
+      modelsWithItems.forEach(model => autoSaveModel(model));
+    }, 1500); // Save after 1.5 seconds of inactivity
+
+    return () => clearTimeout(timeoutId);
+  }, [models, user, autoSaveModel]);
 
   const handleExportExcel = async () => {
     const workbook = new ExcelJS.Workbook();
@@ -1224,16 +1239,11 @@ export const CostCalculator = forwardRef<HTMLDivElement, CostCalculatorProps>(fu
                   {models.reduce((sum, m) => sum + m.items.length, 0)} kalem kumaş
                 </p>
               </div>
-              <div className="flex gap-3 flex-wrap justify-center">
-                <Button 
-                  onClick={handleSaveAllCosts}
-                  size="lg"
-                  variant="outline"
-                  className="shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 px-8"
-                >
-                  <Save className="h-5 w-5 mr-3" />
-                  Tümünü Kaydet
-                </Button>
+              <div className="flex gap-3 flex-wrap justify-center items-center">
+                <span className="text-xs text-muted-foreground flex items-center gap-1">
+                  <Save className="h-3 w-3" />
+                  Otomatik kaydediliyor
+                </span>
                 <Button 
                   onClick={handleExportExcel} 
                   size="lg"
