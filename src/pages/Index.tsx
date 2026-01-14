@@ -53,7 +53,7 @@ const Index = () => {
       <footer className="border-t border-border/50 py-6 mt-12 bg-card/50 backdrop-blur-sm relative z-10">
         <div className="container mx-auto px-4 text-center">
           <p className="text-sm text-muted-foreground">
-            © 2025 Tekstil Maliyet Hesaplama Sistemi
+            TAHA GİYİM - 2025 ARALIK - AKIN ALTUN
           </p>
         </div>
       </footer>
