@@ -1,11 +1,11 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Header } from "@/components/Header";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Search, Trash2, Calendar, Package, ArrowLeft, Loader2, Download, FileSpreadsheet } from "lucide-react";
+import { Search, Trash2, Calendar, Package, ArrowLeft, Loader2, Download, FileSpreadsheet, Pencil, Check, X, Upload, Image } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
@@ -40,6 +40,12 @@ const SavedCosts = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  
+  // Edit states
+  const [editingModelId, setEditingModelId] = useState<string | null>(null);
+  const [editModelName, setEditModelName] = useState("");
+  const [editingImagesId, setEditingImagesId] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (user) {
@@ -94,6 +100,113 @@ const SavedCosts = () => {
       console.error("Error deleting cost:", error);
       toast.error("Silme işlemi başarısız");
     }
+  };
+
+  // Model name editing
+  const handleStartEditModelName = (cost: SavedCost) => {
+    setEditingModelId(cost.id);
+    setEditModelName(cost.model_name);
+  };
+
+  const handleSaveModelName = async () => {
+    if (!editingModelId || !editModelName.trim()) return;
+    
+    try {
+      const { error } = await supabase
+        .from("saved_costs")
+        .update({ model_name: editModelName.trim() })
+        .eq("id", editingModelId);
+
+      if (error) throw error;
+      
+      setCosts(costs.map(c => 
+        c.id === editingModelId ? { ...c, model_name: editModelName.trim() } : c
+      ));
+      setEditingModelId(null);
+      setEditModelName("");
+      toast.success("Model adı güncellendi");
+    } catch (error) {
+      console.error("Error updating model name:", error);
+      toast.error("Güncelleme başarısız");
+    }
+  };
+
+  const handleCancelEditModelName = () => {
+    setEditingModelId(null);
+    setEditModelName("");
+  };
+
+  // Image editing
+  const handleStartEditImages = (costId: string) => {
+    setEditingImagesId(costId);
+  };
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>, costId: string) => {
+    if (!e.target.files || e.target.files.length === 0) return;
+    
+    const cost = costs.find(c => c.id === costId);
+    if (!cost) return;
+
+    const files = Array.from(e.target.files).slice(0, 10 - (cost.images?.length || 0));
+    const readers = files.map(
+      (file) =>
+        new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result as string);
+          reader.onerror = () => reject(new Error("File read error"));
+          reader.readAsDataURL(file);
+        })
+    );
+
+    try {
+      const newImages = await Promise.all(readers);
+      const updatedImages = [...(cost.images || []), ...newImages].slice(0, 10);
+      
+      const { error } = await supabase
+        .from("saved_costs")
+        .update({ images: updatedImages })
+        .eq("id", costId);
+
+      if (error) throw error;
+      
+      setCosts(costs.map(c => 
+        c.id === costId ? { ...c, images: updatedImages } : c
+      ));
+      toast.success("Resimler eklendi");
+    } catch (error) {
+      console.error("Error uploading images:", error);
+      toast.error("Resim yükleme başarısız");
+    }
+    
+    e.target.value = "";
+  };
+
+  const handleRemoveImage = async (costId: string, imageIndex: number) => {
+    const cost = costs.find(c => c.id === costId);
+    if (!cost) return;
+
+    const updatedImages = cost.images.filter((_, i) => i !== imageIndex);
+    
+    try {
+      const { error } = await supabase
+        .from("saved_costs")
+        .update({ images: updatedImages })
+        .eq("id", costId);
+
+      if (error) throw error;
+      
+      setCosts(costs.map(c => 
+        c.id === costId ? { ...c, images: updatedImages } : c
+      ));
+      toast.success("Resim silindi");
+    } catch (error) {
+      console.error("Error removing image:", error);
+      toast.error("Resim silme başarısız");
+    }
+  };
+
+  const handleCloseImageEdit = () => {
+    setEditingImagesId(null);
   };
 
   const handleSelectToggle = (id: string) => {
@@ -432,7 +545,7 @@ const SavedCosts = () => {
 
             <div className="grid gap-4">
               {filteredCosts.map((cost) => (
-                <Card key={cost.id} className="glass-card hover:shadow-lg transition-shadow">
+                <Card key={cost.id} className="glass-card hover:shadow-lg transition-shadow group">
                   <CardContent className="p-4">
                     <div className="flex items-start gap-4">
                       {/* Checkbox */}
@@ -443,19 +556,109 @@ const SavedCosts = () => {
                         />
                       </div>
 
-                      {/* Image Preview */}
-                      {cost.images && cost.images.length > 0 && (
-                        <img 
-                          src={cost.images[0]} 
-                          alt="Model" 
-                          className="h-20 w-20 object-cover rounded-lg border shrink-0"
-                        />
-                      )}
+                      {/* Image Preview / Edit */}
+                      <div className="shrink-0">
+                        {editingImagesId === cost.id ? (
+                          <div className="space-y-2">
+                            <div className="flex flex-wrap gap-2">
+                              {cost.images && cost.images.map((img, idx) => (
+                                <div key={idx} className="relative group">
+                                  <img 
+                                    src={img} 
+                                    alt={`Model ${idx + 1}`} 
+                                    className="h-16 w-16 object-cover rounded border"
+                                  />
+                                  <button
+                                    onClick={() => handleRemoveImage(cost.id, idx)}
+                                    className="absolute -top-1 -right-1 bg-destructive text-destructive-foreground rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
+                                  >
+                                    <X className="h-3 w-3" />
+                                  </button>
+                                </div>
+                              ))}
+                              {(!cost.images || cost.images.length < 10) && (
+                                <label className="h-16 w-16 border-2 border-dashed border-muted-foreground/30 rounded flex items-center justify-center cursor-pointer hover:border-primary/50 transition-colors">
+                                  <Upload className="h-5 w-5 text-muted-foreground" />
+                                  <input
+                                    type="file"
+                                    accept="image/*"
+                                    multiple
+                                    className="hidden"
+                                    onChange={(e) => handleImageUpload(e, cost.id)}
+                                  />
+                                </label>
+                              )}
+                            </div>
+                            <Button size="sm" variant="outline" onClick={handleCloseImageEdit}>
+                              <Check className="h-3 w-3 mr-1" />
+                              Tamam
+                            </Button>
+                          </div>
+                        ) : (
+                          <div 
+                            className="relative group cursor-pointer"
+                            onClick={() => handleStartEditImages(cost.id)}
+                          >
+                            {cost.images && cost.images.length > 0 ? (
+                              <>
+                                <img 
+                                  src={cost.images[0]} 
+                                  alt="Model" 
+                                  className="h-20 w-20 object-cover rounded-lg border"
+                                />
+                                <div className="absolute inset-0 bg-black/50 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                  <Pencil className="h-5 w-5 text-white" />
+                                </div>
+                                {cost.images.length > 1 && (
+                                  <Badge className="absolute -bottom-1 -right-1 text-xs px-1">
+                                    +{cost.images.length - 1}
+                                  </Badge>
+                                )}
+                              </>
+                            ) : (
+                              <div className="h-20 w-20 border-2 border-dashed border-muted-foreground/30 rounded-lg flex items-center justify-center hover:border-primary/50 transition-colors">
+                                <Image className="h-6 w-6 text-muted-foreground" />
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
 
                       {/* Content */}
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-3 mb-2">
-                          <h3 className="font-semibold text-lg truncate">{cost.model_name}</h3>
+                          {editingModelId === cost.id ? (
+                            <div className="flex items-center gap-2">
+                              <Input
+                                value={editModelName}
+                                onChange={(e) => setEditModelName(e.target.value)}
+                                className="h-8 w-48"
+                                autoFocus
+                                onKeyDown={(e) => {
+                                  if (e.key === "Enter") handleSaveModelName();
+                                  if (e.key === "Escape") handleCancelEditModelName();
+                                }}
+                              />
+                              <Button size="icon" variant="ghost" className="h-7 w-7" onClick={handleSaveModelName}>
+                                <Check className="h-4 w-4 text-green-600" />
+                              </Button>
+                              <Button size="icon" variant="ghost" className="h-7 w-7" onClick={handleCancelEditModelName}>
+                                <X className="h-4 w-4 text-destructive" />
+                              </Button>
+                            </div>
+                          ) : (
+                            <>
+                              <h3 className="font-semibold text-lg truncate">{cost.model_name}</h3>
+                              <Button 
+                                size="icon" 
+                                variant="ghost" 
+                                className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
+                                onClick={() => handleStartEditModelName(cost)}
+                              >
+                                <Pencil className="h-3 w-3" />
+                              </Button>
+                            </>
+                          )}
                           <Badge variant="secondary" className="shrink-0">
                             {cost.items.length} kalem
                           </Badge>
@@ -516,7 +719,7 @@ const SavedCosts = () => {
       <footer className="border-t border-border/50 py-6 mt-12 bg-card/50 backdrop-blur-sm relative z-10">
         <div className="container mx-auto px-4 text-center">
           <p className="text-sm text-muted-foreground">
-            © 2025 Tekstil Maliyet Hesaplama Sistemi
+            TAHA GİYİM - 2025 ARALIK - AKIN ALTUN
           </p>
         </div>
       </footer>
