@@ -1,4 +1,4 @@
-import { Scissors, User, LogOut, Shield, DollarSign, Archive } from "lucide-react";
+import { Scissors, User, LogOut, Shield, DollarSign, Archive, ShoppingCart } from "lucide-react";
 import { ClockWeather } from "./ClockWeather";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useNavigate } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
+import LCWLogo from "@/assets/lcw-logo";
 
 interface HeaderProps {
   onRadioToggle?: () => void;
@@ -45,6 +46,11 @@ export function Header({ onRadioToggle, isRadioOpen = false }: HeaderProps) {
               <p className="text-xs text-muted-foreground">
                 Profesyonel Hesaplama Sistemi
               </p>
+            </div>
+            
+            {/* LC Waikiki Logo */}
+            <div className="hidden md:flex items-center pl-4 border-l border-border/50">
+              <LCWLogo className="h-5 w-auto text-primary" />
             </div>
           </div>
           
@@ -85,6 +91,10 @@ export function Header({ onRadioToggle, isRadioOpen = false }: HeaderProps) {
                   <DropdownMenuItem onClick={() => navigate("/saved-costs")} className="cursor-pointer">
                     <Archive className="h-4 w-4 mr-2" />
                     Kayıtlı Maliyetler
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => navigate("/orders")} className="cursor-pointer">
+                    <ShoppingCart className="h-4 w-4 mr-2" />
+                    Siparişler
                   </DropdownMenuItem>
                   {isAdmin && (
                     <>
