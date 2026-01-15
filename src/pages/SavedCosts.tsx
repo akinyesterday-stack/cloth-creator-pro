@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Search, Trash2, Calendar, Package, ArrowLeft, Loader2, Download, FileSpreadsheet, Pencil, Check, X, Upload, Image } from "lucide-react";
+import { Search, Trash2, Calendar, Package, ArrowLeft, Loader2, Download, FileSpreadsheet, Pencil, Check, X, Upload, Image, ArrowUpDown, Plus } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
@@ -13,6 +13,19 @@ import { useNavigate } from "react-router-dom";
 import { format } from "date-fns";
 import { tr } from "date-fns/locale";
 import ExcelJS from "exceljs";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 interface FabricItem {
   id: string;
@@ -40,18 +53,23 @@ const SavedCosts = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
   
   // Edit states
   const [editingModelId, setEditingModelId] = useState<string | null>(null);
   const [editModelName, setEditModelName] = useState("");
   const [editingImagesId, setEditingImagesId] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  
+  // Edit items dialog
+  const [editingItemsCostId, setEditingItemsCostId] = useState<string | null>(null);
+  const [editingItems, setEditingItems] = useState<FabricItem[]>([]);
 
   useEffect(() => {
     if (user) {
       loadCosts();
     }
-  }, [user]);
+  }, [user, sortOrder]);
 
   const loadCosts = async () => {
     if (!user) return;
@@ -61,7 +79,7 @@ const SavedCosts = () => {
         .from("saved_costs")
         .select("*")
         .eq("user_id", user.id)
-        .order("created_at", { ascending: false });
+        .order("created_at", { ascending: sortOrder === "asc" });
 
       if (error) throw error;
       
@@ -207,6 +225,70 @@ const SavedCosts = () => {
 
   const handleCloseImageEdit = () => {
     setEditingImagesId(null);
+  };
+
+  // Item editing functions
+  const handleStartEditItems = (cost: SavedCost) => {
+    setEditingItemsCostId(cost.id);
+    setEditingItems([...cost.items]);
+  };
+
+  const handleAddNewItem = () => {
+    const newItem: FabricItem = {
+      id: crypto.randomUUID(),
+      fabricType: "",
+      usageArea: "",
+      en: 0,
+      gramaj: 0,
+      fiyat: 0,
+    };
+    setEditingItems([...editingItems, newItem]);
+  };
+
+  const handleUpdateItem = (index: number, field: keyof FabricItem, value: string | number) => {
+    const updated = [...editingItems];
+    updated[index] = { ...updated[index], [field]: value };
+    setEditingItems(updated);
+  };
+
+  const handleRemoveItem = (index: number) => {
+    setEditingItems(editingItems.filter((_, i) => i !== index));
+  };
+
+  const handleSaveItems = async () => {
+    if (!editingItemsCostId) return;
+    
+    const validItems = editingItems.filter(item => item.fabricType.trim());
+    const totalCost = validItems.reduce((sum, item) => sum + item.fiyat, 0);
+    
+    try {
+      const { error } = await supabase
+        .from("saved_costs")
+        .update({ 
+          items: JSON.parse(JSON.stringify(validItems)),
+          total_cost: totalCost
+        })
+        .eq("id", editingItemsCostId);
+
+      if (error) throw error;
+      
+      setCosts(costs.map(c => 
+        c.id === editingItemsCostId 
+          ? { ...c, items: validItems, total_cost: totalCost } 
+          : c
+      ));
+      setEditingItemsCostId(null);
+      setEditingItems([]);
+      toast.success("Kalemler güncellendi");
+    } catch (error) {
+      console.error("Error updating items:", error);
+      toast.error("Güncelleme başarısız");
+    }
+  };
+
+  const handleCancelEditItems = () => {
+    setEditingItemsCostId(null);
+    setEditingItems([]);
   };
 
   const handleSelectToggle = (id: string) => {
@@ -498,6 +580,15 @@ const SavedCosts = () => {
                 />
               </div>
               
+              <Button
+                variant="outline"
+                onClick={() => setSortOrder(sortOrder === "desc" ? "asc" : "desc")}
+                className="gap-2"
+              >
+                <ArrowUpDown className="h-4 w-4" />
+                {sortOrder === "desc" ? "Yeniden Eskiye" : "Eskiden Yeniye"}
+              </Button>
+              
               {selectedIds.size > 0 && (
                 <Button 
                   onClick={handleDownloadSelected}
@@ -596,27 +687,31 @@ const SavedCosts = () => {
                           </div>
                         ) : (
                           <div 
-                            className="relative group cursor-pointer"
+                            className="relative group cursor-pointer flex gap-1 flex-wrap"
                             onClick={() => handleStartEditImages(cost.id)}
                           >
                             {cost.images && cost.images.length > 0 ? (
                               <>
-                                <img 
-                                  src={cost.images[0]} 
-                                  alt="Model" 
-                                  className="h-20 w-20 object-cover rounded-lg border"
-                                />
-                                <div className="absolute inset-0 bg-black/50 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                {cost.images.slice(0, 4).map((img, idx) => (
+                                  <div key={idx} className="relative">
+                                    <img 
+                                      src={img} 
+                                      alt={`Model ${idx + 1}`} 
+                                      className="h-16 w-16 object-cover rounded-lg border"
+                                    />
+                                  </div>
+                                ))}
+                                {cost.images.length > 4 && (
+                                  <div className="h-16 w-16 rounded-lg border bg-muted flex items-center justify-center">
+                                    <span className="text-sm font-medium text-muted-foreground">+{cost.images.length - 4}</span>
+                                  </div>
+                                )}
+                                <div className="absolute inset-0 bg-black/30 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center pointer-events-none">
                                   <Pencil className="h-5 w-5 text-white" />
                                 </div>
-                                {cost.images.length > 1 && (
-                                  <Badge className="absolute -bottom-1 -right-1 text-xs px-1">
-                                    +{cost.images.length - 1}
-                                  </Badge>
-                                )}
                               </>
                             ) : (
-                              <div className="h-20 w-20 border-2 border-dashed border-muted-foreground/30 rounded-lg flex items-center justify-center hover:border-primary/50 transition-colors">
+                              <div className="h-16 w-16 border-2 border-dashed border-muted-foreground/30 rounded-lg flex items-center justify-center hover:border-primary/50 transition-colors">
                                 <Image className="h-6 w-6 text-muted-foreground" />
                               </div>
                             )}
@@ -692,6 +787,15 @@ const SavedCosts = () => {
                         <Button 
                           variant="outline" 
                           size="icon"
+                          onClick={() => handleStartEditItems(cost)}
+                          title="Kalemleri düzenle"
+                        >
+                          <Plus className="h-4 w-4" />
+                        </Button>
+                        
+                        <Button 
+                          variant="outline" 
+                          size="icon"
                           onClick={() => handleDownloadSingle(cost)}
                           title="Excel olarak indir"
                         >
@@ -714,6 +818,94 @@ const SavedCosts = () => {
             </div>
           </>
         )}
+
+        {/* Edit Items Dialog */}
+        <Dialog open={!!editingItemsCostId} onOpenChange={(open) => !open && handleCancelEditItems()}>
+          <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Kalemleri Düzenle</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4 mt-4">
+              {editingItems.map((item, idx) => (
+                <div key={item.id || idx} className="flex items-start gap-2 p-3 border rounded-lg bg-muted/30">
+                  <div className="flex-1 grid grid-cols-2 md:grid-cols-3 gap-2">
+                    <div>
+                      <label className="text-xs text-muted-foreground">Kumaş Türü</label>
+                      <Input
+                        placeholder="Kumaş türü"
+                        value={item.fabricType}
+                        onChange={(e) => handleUpdateItem(idx, "fabricType", e.target.value)}
+                        className="h-8"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs text-muted-foreground">Kullanım Yeri</label>
+                      <Input
+                        placeholder="Kullanım yeri"
+                        value={item.usageArea}
+                        onChange={(e) => handleUpdateItem(idx, "usageArea", e.target.value)}
+                        className="h-8"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs text-muted-foreground">En (CM)</label>
+                      <Input
+                        type="number"
+                        placeholder="En"
+                        value={item.en || ""}
+                        onChange={(e) => handleUpdateItem(idx, "en", Number(e.target.value))}
+                        className="h-8"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs text-muted-foreground">Gramaj (GR)</label>
+                      <Input
+                        type="number"
+                        placeholder="Gramaj"
+                        value={item.gramaj || ""}
+                        onChange={(e) => handleUpdateItem(idx, "gramaj", Number(e.target.value))}
+                        className="h-8"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs text-muted-foreground">Fiyat (₺)</label>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        placeholder="Fiyat"
+                        value={item.fiyat || ""}
+                        onChange={(e) => handleUpdateItem(idx, "fiyat", Number(e.target.value))}
+                        className="h-8"
+                      />
+                    </div>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 text-destructive hover:text-destructive shrink-0"
+                    onClick={() => handleRemoveItem(idx)}
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
+              ))}
+              
+              <Button variant="outline" className="w-full" onClick={handleAddNewItem}>
+                <Plus className="h-4 w-4 mr-2" />
+                Yeni Kalem Ekle
+              </Button>
+              
+              <div className="flex justify-end gap-2 pt-4 border-t">
+                <Button variant="outline" onClick={handleCancelEditItems}>
+                  İptal
+                </Button>
+                <Button onClick={handleSaveItems}>
+                  Kaydet
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
       </main>
       
       <footer className="border-t border-border/50 py-6 mt-12 bg-card/50 backdrop-blur-sm relative z-10">
