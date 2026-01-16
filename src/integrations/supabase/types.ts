@@ -51,34 +51,55 @@ export type Database = {
         Row: {
           created_at: string
           description: string | null
+          en: number | null
+          fabric_type: string | null
+          gramaj: number | null
           id: string
           items: Json
+          model_image: string | null
           order_name: string
+          price: number | null
           status: string
+          termin_date: string | null
           total_amount: number
           updated_at: string
+          usage_area: string | null
           user_id: string
         }
         Insert: {
           created_at?: string
           description?: string | null
+          en?: number | null
+          fabric_type?: string | null
+          gramaj?: number | null
           id?: string
           items?: Json
+          model_image?: string | null
           order_name: string
+          price?: number | null
           status?: string
+          termin_date?: string | null
           total_amount?: number
           updated_at?: string
+          usage_area?: string | null
           user_id: string
         }
         Update: {
           created_at?: string
           description?: string | null
+          en?: number | null
+          fabric_type?: string | null
+          gramaj?: number | null
           id?: string
           items?: Json
+          model_image?: string | null
           order_name?: string
+          price?: number | null
           status?: string
+          termin_date?: string | null
           total_amount?: number
           updated_at?: string
+          usage_area?: string | null
           user_id?: string
         }
         Relationships: []
@@ -176,6 +197,42 @@ export type Database = {
         }
         Relationships: []
       }
+      sticky_notes: {
+        Row: {
+          color: string
+          content: string
+          created_at: string
+          id: string
+          position_x: number
+          position_y: number
+          title: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          color?: string
+          content?: string
+          created_at?: string
+          id?: string
+          position_x?: number
+          position_y?: number
+          title?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          color?: string
+          content?: string
+          created_at?: string
+          id?: string
+          position_x?: number
+          position_y?: number
+          title?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_fabric_types: {
         Row: {
           created_at: string
@@ -220,6 +277,30 @@ export type Database = {
           created_at?: string
           id?: string
           role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
+      user_settings: {
+        Row: {
+          created_at: string
+          id: string
+          menu_order: Json
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          menu_order?: Json
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          menu_order?: Json
+          updated_at?: string
           user_id?: string
         }
         Relationships: []

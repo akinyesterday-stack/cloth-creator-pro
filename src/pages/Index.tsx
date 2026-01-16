@@ -1,22 +1,23 @@
 import { useState } from "react";
 import { Header } from "@/components/Header";
 import { CostCalculator } from "@/components/CostCalculator";
+import { Dashboard } from "@/components/Dashboard";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Calculator, LayoutDashboard } from "lucide-react";
 
 const Index = () => {
   const [isRadioOpen, setIsRadioOpen] = useState(false);
   const [isRadioMinimized, setIsRadioMinimized] = useState(false);
+  const [activeTab, setActiveTab] = useState("dashboard");
 
   const handleRadioToggle = () => {
     if (isRadioOpen) {
-      // If open and not minimized, minimize it
       if (!isRadioMinimized) {
         setIsRadioMinimized(true);
       } else {
-        // If minimized, expand it
         setIsRadioMinimized(false);
       }
     } else {
-      // If closed, open it
       setIsRadioOpen(true);
       setIsRadioMinimized(false);
     }
@@ -42,12 +43,31 @@ const Index = () => {
       />
       
       <main className="container mx-auto px-4 py-8 relative z-10">
-        <CostCalculator 
-          isRadioOpen={isRadioOpen}
-          isRadioMinimized={isRadioMinimized}
-          onRadioClose={handleRadioClose}
-          onRadioMinimize={handleRadioMinimize}
-        />
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+          <TabsList className="mb-6 bg-card/80 backdrop-blur-sm border">
+            <TabsTrigger value="dashboard" className="gap-2">
+              <LayoutDashboard className="h-4 w-4" />
+              Dashboard
+            </TabsTrigger>
+            <TabsTrigger value="calculator" className="gap-2">
+              <Calculator className="h-4 w-4" />
+              Maliyet Hesaplama
+            </TabsTrigger>
+          </TabsList>
+          
+          <TabsContent value="dashboard" className="mt-0">
+            <Dashboard />
+          </TabsContent>
+          
+          <TabsContent value="calculator" className="mt-0">
+            <CostCalculator 
+              isRadioOpen={isRadioOpen}
+              isRadioMinimized={isRadioMinimized}
+              onRadioClose={handleRadioClose}
+              onRadioMinimize={handleRadioMinimize}
+            />
+          </TabsContent>
+        </Tabs>
       </main>
       
       <footer className="border-t border-border/50 py-6 mt-12 bg-card/50 backdrop-blur-sm relative z-10">
