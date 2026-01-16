@@ -1,6 +1,7 @@
-import { Scissors, User, LogOut, Shield, DollarSign, Archive, ShoppingCart } from "lucide-react";
+import { User, LogOut, Shield, DollarSign, Archive, ShoppingCart, ChevronUp, ChevronDown } from "lucide-react";
 import { ClockWeather } from "./ClockWeather";
 import { useAuth } from "@/hooks/useAuth";
+import { useMenuOrder } from "@/hooks/useMenuOrder";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -9,6 +10,9 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useNavigate } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
@@ -19,8 +23,15 @@ interface HeaderProps {
   isRadioOpen?: boolean;
 }
 
+const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
+  ShoppingCart,
+  Archive,
+  DollarSign,
+};
+
 export function Header({ onRadioToggle, isRadioOpen = false }: HeaderProps) {
   const { user, profile, isAdmin, signOut } = useAuth();
+  const { getOrderedMenuItems, moveToTop, moveToBottom } = useMenuOrder();
   const navigate = useNavigate();
 
   const handleSignOut = async () => {
@@ -28,29 +39,29 @@ export function Header({ onRadioToggle, isRadioOpen = false }: HeaderProps) {
     navigate("/auth");
   };
 
+  const orderedMenuItems = getOrderedMenuItems();
+
   return (
     <header className="sticky top-0 z-50 w-full bg-card/95 backdrop-blur-md border-b border-border/50 shadow-sm">
       <div className="container mx-auto px-4">
         <div className="flex h-20 items-center justify-between">
           <div className="flex items-center gap-4">
-            <div className="relative">
-              <div className="absolute inset-0 bg-primary/20 blur-xl rounded-full" />
-              <div className="relative p-3 gradient-primary rounded-xl shadow-lg">
-                <Scissors className="h-7 w-7 text-primary-foreground" />
-              </div>
-            </div>
-            <div>
-              <h1 className="text-2xl font-bold text-gradient">
-                Tekstil Maliyet
-              </h1>
-              <p className="text-xs text-muted-foreground">
-                Profesyonel Hesaplama Sistemi
-              </p>
+            {/* LC Waikiki Logo */}
+            <div className="flex items-center">
+              <LCWLogo className="h-8 w-auto text-primary" />
             </div>
             
-            {/* LC Waikiki Logo */}
-            <div className="hidden md:flex items-center pl-4 border-l border-border/50">
-              <LCWLogo className="h-5 w-auto text-primary" />
+            {/* Title */}
+            <div className="border-l border-border/50 pl-4">
+              <h1 className="text-lg font-bold text-gradient leading-tight">
+                Kumaş
+              </h1>
+              <h1 className="text-lg font-bold text-gradient leading-tight">
+                Tedarik
+              </h1>
+              <h1 className="text-lg font-bold text-gradient leading-tight">
+                Sistemi
+              </h1>
             </div>
           </div>
           
@@ -76,7 +87,7 @@ export function Header({ onRadioToggle, isRadioOpen = false }: HeaderProps) {
                     )}
                   </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-56">
+                <DropdownMenuContent align="end" className="w-64">
                   <DropdownMenuLabel>
                     <div className="flex flex-col">
                       <span>{profile.full_name}</span>
@@ -84,20 +95,37 @@ export function Header({ onRadioToggle, isRadioOpen = false }: HeaderProps) {
                     </div>
                   </DropdownMenuLabel>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={() => navigate("/fabric-prices")} className="cursor-pointer">
-                    <DollarSign className="h-4 w-4 mr-2" />
-                    Kalite Fiyatları
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => navigate("/saved-costs")} className="cursor-pointer">
-                    <Archive className="h-4 w-4 mr-2" />
-                    Kayıtlı Maliyetler
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => navigate("/orders")} className="cursor-pointer">
-                    <ShoppingCart className="h-4 w-4 mr-2" />
-                    Siparişler
-                  </DropdownMenuItem>
+                  
+                  {/* Ordered Menu Items */}
+                  {orderedMenuItems.map((item) => {
+                    const IconComponent = iconMap[item.icon];
+                    return (
+                      <DropdownMenuSub key={item.id}>
+                        <DropdownMenuSubTrigger className="cursor-pointer">
+                          {IconComponent && <IconComponent className="h-4 w-4 mr-2" />}
+                          {item.label}
+                        </DropdownMenuSubTrigger>
+                        <DropdownMenuSubContent>
+                          <DropdownMenuItem onClick={() => navigate(item.path)} className="cursor-pointer">
+                            Aç
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem onClick={() => moveToTop(item.id)} className="cursor-pointer">
+                            <ChevronUp className="h-4 w-4 mr-2" />
+                            En Üste Al
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => moveToBottom(item.id)} className="cursor-pointer">
+                            <ChevronDown className="h-4 w-4 mr-2" />
+                            En Alta Al
+                          </DropdownMenuItem>
+                        </DropdownMenuSubContent>
+                      </DropdownMenuSub>
+                    );
+                  })}
+
                   {isAdmin && (
                     <>
+                      <DropdownMenuSeparator />
                       <DropdownMenuItem onClick={() => navigate("/admin")} className="cursor-pointer">
                         <Shield className="h-4 w-4 mr-2" />
                         Admin Paneli

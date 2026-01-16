@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Search, Trash2, Calendar, Package, ArrowLeft, Loader2, Download, FileSpreadsheet, Pencil, Check, X, Upload, Image, ArrowUpDown, Plus } from "lucide-react";
+import { Search, Trash2, Calendar, Package, ArrowLeft, Loader2, Download, FileSpreadsheet, Pencil, Check, X, Upload, Image, ArrowUpDown, Plus, SendHorizontal } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
@@ -26,6 +26,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 interface FabricItem {
   id: string;
@@ -289,6 +294,35 @@ const SavedCosts = () => {
   const handleCancelEditItems = () => {
     setEditingItemsCostId(null);
     setEditingItems([]);
+  };
+
+  // Transfer to orders
+  const handleTransferToOrders = async (cost: SavedCost) => {
+    if (!user) return;
+
+    try {
+      // Create an order for each item in the cost
+      for (const item of cost.items) {
+        await supabase
+          .from("orders")
+          .insert({
+            user_id: user.id,
+            order_name: cost.model_name,
+            model_image: cost.images && cost.images.length > 0 ? cost.images[0] : null,
+            fabric_type: item.fabricType,
+            usage_area: item.usageArea,
+            en: item.en,
+            gramaj: item.gramaj,
+            price: item.fiyat,
+            status: "pending",
+          });
+      }
+
+      toast.success(`"${cost.model_name}" siparişlere aktarıldı (${cost.items.length} kalem)`);
+    } catch (error) {
+      console.error("Error transferring to orders:", error);
+      toast.error("Siparişe aktarma başarısız");
+    }
   };
 
   const handleSelectToggle = (id: string) => {
@@ -784,23 +818,45 @@ const SavedCosts = () => {
                       
                       {/* Actions */}
                       <div className="flex items-center gap-2 shrink-0">
-                        <Button 
-                          variant="outline" 
-                          size="icon"
-                          onClick={() => handleStartEditItems(cost)}
-                          title="Kalemleri düzenle"
-                        >
-                          <Plus className="h-4 w-4" />
-                        </Button>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button 
+                              variant="outline" 
+                              size="icon"
+                              onClick={() => handleTransferToOrders(cost)}
+                              className="text-green-600 hover:text-green-700 hover:bg-green-50"
+                            >
+                              <SendHorizontal className="h-4 w-4" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>Siparişlere Aktar</TooltipContent>
+                        </Tooltip>
                         
-                        <Button 
-                          variant="outline" 
-                          size="icon"
-                          onClick={() => handleDownloadSingle(cost)}
-                          title="Excel olarak indir"
-                        >
-                          <Download className="h-4 w-4" />
-                        </Button>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button 
+                              variant="outline" 
+                              size="icon"
+                              onClick={() => handleStartEditItems(cost)}
+                            >
+                              <Plus className="h-4 w-4" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>Kalemleri Düzenle</TooltipContent>
+                        </Tooltip>
+                        
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button 
+                              variant="outline" 
+                              size="icon"
+                              onClick={() => handleDownloadSingle(cost)}
+                            >
+                              <Download className="h-4 w-4" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>Excel İndir</TooltipContent>
+                        </Tooltip>
                         
                         <Button 
                           variant="outline" 
