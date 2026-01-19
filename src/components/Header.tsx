@@ -1,5 +1,6 @@
 import { User, LogOut, Shield, DollarSign, Archive, ShoppingCart, ChevronUp, ChevronDown } from "lucide-react";
 import { ClockWeather } from "./ClockWeather";
+import { NotificationBell } from "./NotificationBell";
 import { useAuth } from "@/hooks/useAuth";
 import { useMenuOrder } from "@/hooks/useMenuOrder";
 import { Button } from "@/components/ui/button";
@@ -69,6 +70,9 @@ export function Header({ onRadioToggle, isRadioOpen = false }: HeaderProps) {
             <div className="hidden sm:block">
               <ClockWeather onRadioToggle={onRadioToggle} isRadioOpen={isRadioOpen} />
             </div>
+            
+            {/* Notification Bell */}
+            <NotificationBell />
 
             {/* User Menu */}
             {user && profile && (
