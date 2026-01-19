@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { 
   Plus, X, Calendar, Clock, AlertTriangle, 
   StickyNote, Trash2, Mail, MailOpen, Check, Reply,
-  Send, User
+  Send, User, GripVertical, Loader2
 } from "lucide-react";
 import { 
   Select,
@@ -62,11 +62,11 @@ interface UserProfile {
 }
 
 const noteColors = [
-  { name: "yellow", bg: "bg-yellow-100", border: "border-yellow-300", text: "text-yellow-800" },
-  { name: "blue", bg: "bg-blue-100", border: "border-blue-300", text: "text-blue-800" },
-  { name: "green", bg: "bg-green-100", border: "border-green-300", text: "text-green-800" },
-  { name: "pink", bg: "bg-pink-100", border: "border-pink-300", text: "text-pink-800" },
-  { name: "purple", bg: "bg-purple-100", border: "border-purple-300", text: "text-purple-800" },
+  { name: "yellow", bg: "bg-amber-100", border: "border-amber-400", text: "text-amber-900", shadow: "shadow-amber-200/50" },
+  { name: "blue", bg: "bg-sky-100", border: "border-sky-400", text: "text-sky-900", shadow: "shadow-sky-200/50" },
+  { name: "green", bg: "bg-emerald-100", border: "border-emerald-400", text: "text-emerald-900", shadow: "shadow-emerald-200/50" },
+  { name: "pink", bg: "bg-rose-100", border: "border-rose-400", text: "text-rose-900", shadow: "shadow-rose-200/50" },
+  { name: "purple", bg: "bg-violet-100", border: "border-violet-400", text: "text-violet-900", shadow: "shadow-violet-200/50" },
 ];
 
 export function Dashboard() {
@@ -77,7 +77,10 @@ export function Dashboard() {
   const [allUsers, setAllUsers] = useState<UserProfile[]>([]);
   const [isLoadingNotes, setIsLoadingNotes] = useState(true);
   const [isLoadingOrders, setIsLoadingOrders] = useState(true);
+  const [isLoadingUsers, setIsLoadingUsers] = useState(true);
   const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
+  const [draggingNoteId, setDraggingNoteId] = useState<string | null>(null);
+  const notesContainerRef = useRef<HTMLDivElement>(null);
   
   // New note dialog state
   const [isNewNoteOpen, setIsNewNoteOpen] = useState(false);
@@ -99,14 +102,27 @@ export function Dashboard() {
   }, [user]);
 
   const loadAllUsers = async () => {
-    // Admin can see all users, regular users see approved users
-    const { data, error } = await supabase
-      .from("profiles")
-      .select("user_id, full_name, username")
-      .eq("status", "approved");
+    if (!user) return;
+    setIsLoadingUsers(true);
+    
+    try {
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("user_id, full_name, username")
+        .eq("status", "approved");
 
-    if (!error && data) {
-      setAllUsers(data.filter(u => u.user_id !== user?.id));
+      if (error) {
+        console.error("Error loading users:", error);
+        return;
+      }
+      
+      // Filter out current user
+      const otherUsers = (data || []).filter(u => u.user_id !== user.id);
+      setAllUsers(otherUsers);
+    } catch (error) {
+      console.error("Error loading users:", error);
+    } finally {
+      setIsLoadingUsers(false);
     }
   };
 
@@ -527,13 +543,16 @@ export function Dashboard() {
         </CardContent>
       </Card>
 
-      {/* Yapışkan Notlar (Kendi Notlarım) */}
-      <Card className="glass-card">
+      {/* Yapışkan Notlar (Kendi Notlarım) - Sürüklenebilir */}
+      <Card className="glass-card overflow-hidden">
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between">
             <CardTitle className="flex items-center gap-2 text-lg">
               <StickyNote className="h-5 w-5 text-primary" />
               Hızlı Notlar
+              <span className="text-xs font-normal text-muted-foreground ml-2">
+                (sürükleyerek taşıyabilirsiniz)
+              </span>
             </CardTitle>
             <Button size="sm" onClick={() => setIsNewNoteOpen(true)} className="gap-1">
               <Plus className="h-4 w-4" />
@@ -543,7 +562,10 @@ export function Dashboard() {
         </CardHeader>
         <CardContent>
           {isLoadingNotes ? (
-            <div className="text-center py-4 text-muted-foreground">Yükleniyor...</div>
+            <div className="text-center py-4 text-muted-foreground">
+              <Loader2 className="h-6 w-6 animate-spin mx-auto mb-2" />
+              Yükleniyor...
+            </div>
           ) : myNotes.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">
               <StickyNote className="h-10 w-10 mx-auto mb-2 opacity-50" />
@@ -551,76 +573,164 @@ export function Dashboard() {
               <p className="text-sm">Maliyetleriniz ve siparişleriniz hakkında notlar alın</p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-              {myNotes.map((note) => {
+            <div 
+              ref={notesContainerRef}
+              className="relative min-h-[400px] bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800 rounded-xl p-4 border border-dashed border-slate-300 dark:border-slate-600"
+            >
+              {myNotes.map((note, index) => {
                 const colorClasses = getNoteColorClasses(note.color);
                 const isEditing = editingNoteId === note.id;
+                const isDragging = draggingNoteId === note.id;
+                
+                // Calculate position based on stored position or default grid
+                const defaultX = (index % 3) * 220 + 10;
+                const defaultY = Math.floor(index / 3) * 200 + 10;
+                const posX = note.position_x || defaultX;
+                const posY = note.position_y || defaultY;
                 
                 return (
                   <div 
                     key={note.id}
-                    className={`relative p-3 rounded-lg border-2 ${colorClasses.bg} ${colorClasses.border} ${colorClasses.text} shadow-sm transition-all hover:shadow-md`}
+                    className={`absolute w-[200px] transition-shadow duration-200 ${isDragging ? 'z-50 scale-105' : 'z-10'}`}
+                    style={{
+                      left: `${posX}px`,
+                      top: `${posY}px`,
+                      cursor: isDragging ? 'grabbing' : 'grab',
+                    }}
+                    onMouseDown={(e) => {
+                      if (isEditing) return;
+                      const startX = e.clientX - posX;
+                      const startY = e.clientY - posY;
+                      setDraggingNoteId(note.id);
+                      
+                      const handleMouseMove = (moveEvent: MouseEvent) => {
+                        const containerRect = notesContainerRef.current?.getBoundingClientRect();
+                        if (!containerRect) return;
+                        
+                        let newX = moveEvent.clientX - startX;
+                        let newY = moveEvent.clientY - startY;
+                        
+                        // Constrain to container bounds
+                        newX = Math.max(0, Math.min(newX, containerRect.width - 210));
+                        newY = Math.max(0, Math.min(newY, containerRect.height - 150));
+                        
+                        setMyNotes(prev => prev.map(n => 
+                          n.id === note.id ? { ...n, position_x: newX, position_y: newY } : n
+                        ));
+                      };
+                      
+                      const handleMouseUp = () => {
+                        setDraggingNoteId(null);
+                        // Save position to database
+                        const currentNote = myNotes.find(n => n.id === note.id);
+                        if (currentNote) {
+                          supabase
+                            .from("sticky_notes")
+                            .update({ 
+                              position_x: currentNote.position_x, 
+                              position_y: currentNote.position_y 
+                            })
+                            .eq("id", note.id)
+                            .then(() => {});
+                        }
+                        document.removeEventListener('mousemove', handleMouseMove);
+                        document.removeEventListener('mouseup', handleMouseUp);
+                      };
+                      
+                      document.addEventListener('mousemove', handleMouseMove);
+                      document.addEventListener('mouseup', handleMouseUp);
+                    }}
                   >
-                    {/* Color picker */}
-                    <div className="flex items-center gap-1 mb-2">
-                      {noteColors.map((c) => (
+                    <div 
+                      className={`
+                        p-3 rounded-xl border-2 
+                        ${colorClasses.bg} ${colorClasses.border} ${colorClasses.text}
+                        shadow-lg ${colorClasses.shadow}
+                        transform rotate-[${(index % 3 - 1) * 2}deg]
+                        hover:rotate-0 hover:scale-105 transition-all duration-200
+                        ${isDragging ? 'shadow-2xl ring-2 ring-primary' : ''}
+                      `}
+                      style={{
+                        transform: isDragging ? 'rotate(0deg) scale(1.05)' : `rotate(${(index % 3 - 1) * 2}deg)`,
+                        boxShadow: isDragging 
+                          ? '0 25px 50px -12px rgba(0, 0, 0, 0.25)' 
+                          : '0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1)',
+                      }}
+                    >
+                      {/* Header with drag handle and actions */}
+                      <div className="flex items-center gap-1 mb-2">
+                        <GripVertical className="h-4 w-4 opacity-50 cursor-grab" />
+                        {noteColors.map((c) => (
+                          <button
+                            key={c.name}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleUpdateNote(note.id, { color: c.name });
+                            }}
+                            className={`w-3 h-3 rounded-full ${c.bg} border ${c.border} ${note.color === c.name ? 'ring-2 ring-offset-1 ring-gray-500' : ''}`}
+                          />
+                        ))}
+                        <div className="flex-1" />
                         <button
-                          key={c.name}
-                          onClick={() => handleUpdateNote(note.id, { color: c.name })}
-                          className={`w-4 h-4 rounded-full ${c.bg} ${c.border} border-2 ${note.color === c.name ? 'ring-2 ring-offset-1 ring-gray-400' : ''}`}
-                        />
-                      ))}
-                      <div className="flex-1" />
-                      <button
-                        onClick={() => handleDeleteNote(note.id)}
-                        className="p-1 rounded hover:bg-black/10 transition-colors"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </button>
-                    </div>
-                    
-                    {isEditing ? (
-                      <div className="space-y-2">
-                        <Input
-                          value={note.title}
-                          onChange={(e) => handleUpdateNote(note.id, { title: e.target.value })}
-                          placeholder="Başlık"
-                          className={`h-8 text-sm font-medium border-0 shadow-none bg-white/50 ${colorClasses.text} placeholder:opacity-50`}
-                          autoFocus
-                        />
-                        <Textarea
-                          value={note.content}
-                          onChange={(e) => handleUpdateNote(note.id, { content: e.target.value })}
-                          placeholder="Notunuzu yazın..."
-                          className={`min-h-[80px] text-sm border-0 shadow-none bg-white/50 resize-none ${colorClasses.text} placeholder:opacity-50`}
-                          rows={4}
-                        />
-                        <Button
-                          size="sm"
-                          variant="secondary"
-                          onClick={() => setEditingNoteId(null)}
-                          className="w-full h-7"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteNote(note.id);
+                          }}
+                          className="p-1 rounded-full hover:bg-black/10 transition-colors"
                         >
-                          Tamam
-                        </Button>
+                          <Trash2 className="h-3 w-3" />
+                        </button>
                       </div>
-                    ) : (
-                      <div 
-                        className="cursor-pointer min-h-[80px]"
-                        onClick={() => setEditingNoteId(note.id)}
-                      >
-                        <p className="font-semibold text-sm mb-1">
-                          {note.title || "Başlıksız"}
-                        </p>
-                        <p className="text-sm opacity-80 whitespace-pre-wrap">
-                          {note.content || "Düzenlemek için tıklayın..."}
+                      
+                      {isEditing ? (
+                        <div className="space-y-2" onClick={(e) => e.stopPropagation()}>
+                          <Input
+                            value={note.title}
+                            onChange={(e) => handleUpdateNote(note.id, { title: e.target.value })}
+                            placeholder="Başlık"
+                            className={`h-8 text-sm font-bold border-0 shadow-none bg-white/70 ${colorClasses.text} placeholder:opacity-50 rounded-lg`}
+                            autoFocus
+                          />
+                          <Textarea
+                            value={note.content}
+                            onChange={(e) => handleUpdateNote(note.id, { content: e.target.value })}
+                            placeholder="Notunuzu yazın..."
+                            className={`min-h-[100px] text-sm border-0 shadow-none bg-white/70 resize-none ${colorClasses.text} placeholder:opacity-50 rounded-lg`}
+                            rows={5}
+                          />
+                          <Button
+                            size="sm"
+                            variant="secondary"
+                            onClick={() => setEditingNoteId(null)}
+                            className="w-full h-7 text-xs"
+                          >
+                            ✓ Tamam
+                          </Button>
+                        </div>
+                      ) : (
+                        <div 
+                          className="cursor-pointer min-h-[100px]"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setEditingNoteId(note.id);
+                          }}
+                        >
+                          <p className="font-bold text-sm mb-2 border-b border-current/20 pb-1">
+                            {note.title || "Başlıksız"}
+                          </p>
+                          <p className="text-xs leading-relaxed whitespace-pre-wrap break-words">
+                            {note.content || "Düzenlemek için tıklayın..."}
+                          </p>
+                        </div>
+                      )}
+                      
+                      {/* Footer with date */}
+                      <div className="flex items-center justify-between mt-3 pt-2 border-t border-current/10">
+                        <p className="text-[10px] opacity-60">
+                          📅 {format(new Date(note.created_at), "d MMM yyyy", { locale: tr })}
                         </p>
                       </div>
-                    )}
-                    
-                    <p className="text-[10px] opacity-50 mt-2">
-                      {format(new Date(note.created_at), "d MMM", { locale: tr })}
-                    </p>
+                    </div>
                   </div>
                 );
               })}
@@ -641,20 +751,41 @@ export function Dashboard() {
           
           <div className="space-y-4">
             <div>
-              <label className="text-sm font-medium mb-1 block">Kime</label>
-              <Select value={newNoteRecipient} onValueChange={setNewNoteRecipient}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Seçin" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="self">Kendime (Not)</SelectItem>
-                  {allUsers.map(u => (
-                    <SelectItem key={u.user_id} value={u.user_id}>
-                      {u.full_name} (@{u.username})
+              <label className="text-sm font-medium mb-2 block">Kime</label>
+              {isLoadingUsers ? (
+                <div className="flex items-center gap-2 text-muted-foreground text-sm py-2">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Kullanıcılar yükleniyor...
+                </div>
+              ) : (
+                <Select value={newNoteRecipient} onValueChange={setNewNoteRecipient}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Seçin" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="self">
+                      <div className="flex items-center gap-2">
+                        <User className="h-4 w-4" />
+                        Kendime (Not)
+                      </div>
                     </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                    {allUsers.length > 0 ? (
+                      allUsers.map(u => (
+                        <SelectItem key={u.user_id} value={u.user_id}>
+                          <div className="flex items-center gap-2">
+                            <Send className="h-4 w-4 text-primary" />
+                            {u.full_name} (@{u.username})
+                          </div>
+                        </SelectItem>
+                      ))
+                    ) : (
+                      <div className="px-2 py-1.5 text-sm text-muted-foreground">
+                        Başka onaylı kullanıcı yok
+                      </div>
+                    )}
+                  </SelectContent>
+                </Select>
+              )}
             </div>
             
             <div>
