@@ -47,6 +47,47 @@ export type Database = {
         }
         Relationships: []
       }
+      notifications: {
+        Row: {
+          created_at: string
+          id: string
+          is_read: boolean
+          message: string | null
+          related_note_id: string | null
+          title: string
+          type: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_read?: boolean
+          message?: string | null
+          related_note_id?: string | null
+          title: string
+          type?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_read?: boolean
+          message?: string | null
+          related_note_id?: string | null
+          title?: string
+          type?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notifications_related_note_id_fkey"
+            columns: ["related_note_id"]
+            isOneToOne: false
+            referencedRelation: "sticky_notes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       orders: {
         Row: {
           created_at: string
@@ -200,33 +241,48 @@ export type Database = {
       sticky_notes: {
         Row: {
           color: string
+          completed_at: string | null
           content: string
           created_at: string
           id: string
+          is_completed: boolean
+          is_read: boolean
           position_x: number
           position_y: number
+          recipient_user_id: string | null
+          reply: string | null
           title: string
           updated_at: string
           user_id: string
         }
         Insert: {
           color?: string
+          completed_at?: string | null
           content?: string
           created_at?: string
           id?: string
+          is_completed?: boolean
+          is_read?: boolean
           position_x?: number
           position_y?: number
+          recipient_user_id?: string | null
+          reply?: string | null
           title?: string
           updated_at?: string
           user_id: string
         }
         Update: {
           color?: string
+          completed_at?: string | null
           content?: string
           created_at?: string
           id?: string
+          is_completed?: boolean
+          is_read?: boolean
           position_x?: number
           position_y?: number
+          recipient_user_id?: string | null
+          reply?: string | null
           title?: string
           updated_at?: string
           user_id?: string
