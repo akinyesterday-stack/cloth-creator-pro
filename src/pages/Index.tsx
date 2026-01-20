@@ -2,7 +2,8 @@ import { useState } from "react";
 import { Header } from "@/components/Header";
 import { CostCalculator } from "@/components/CostCalculator";
 import { Dashboard } from "@/components/Dashboard";
-import { SpreadsheetOrders } from "@/components/SpreadsheetOrders";
+import { ExcelSpreadsheet } from "@/components/ExcelSpreadsheet";
+import { LiveChat } from "@/components/LiveChat";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Calculator, LayoutDashboard, ShoppingCart } from "lucide-react";
 
@@ -14,11 +15,7 @@ const Index = () => {
 
   const handleRadioToggle = () => {
     if (isRadioOpen) {
-      if (!isRadioMinimized) {
-        setIsRadioMinimized(true);
-      } else {
-        setIsRadioMinimized(false);
-      }
+      setIsRadioMinimized(!isRadioMinimized);
     } else {
       setIsRadioOpen(true);
       setIsRadioMinimized(false);
@@ -43,7 +40,7 @@ const Index = () => {
     orders: {
       label: "Siparişler",
       icon: <ShoppingCart className="h-4 w-4" />,
-      content: <SpreadsheetOrders />
+      content: <ExcelSpreadsheet />
     },
     calculator: {
       label: "Maliyet Hesaplama",
@@ -80,7 +77,6 @@ const Index = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Soft gradient overlay */}
       <div className="fixed inset-0 gradient-mesh pointer-events-none" />
       
       <Header 
@@ -117,6 +113,9 @@ const Index = () => {
           ))}
         </Tabs>
       </main>
+      
+      {/* Live Chat Panel */}
+      <LiveChat />
       
       <footer className="border-t border-border/50 py-6 mt-12 bg-card/50 backdrop-blur-sm relative z-10">
         <div className="container mx-auto px-4 text-center">
