@@ -7,9 +7,6 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
   Sheet,
   SheetContent,
-  SheetHeader,
-  SheetTitle,
-  SheetTrigger,
 } from "@/components/ui/sheet";
 import {
   Dialog,
@@ -17,6 +14,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogFooter,
+  DialogDescription,
 } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -27,7 +25,6 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
 import { format } from "date-fns";
-import { tr } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 
 interface ChatMessage {
@@ -85,12 +82,13 @@ export function LiveChat() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSending, setIsSending] = useState(false);
   
-  // Group creation
-  const [isCreateGroupOpen, setIsCreateGroupOpen] = useState(false);
+  // Message/Group creation
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [groupName, setGroupName] = useState("");
   const [selectedMembers, setSelectedMembers] = useState<string[]>([]);
   const [isEditingGroupName, setIsEditingGroupName] = useState(false);
   const [editedGroupName, setEditedGroupName] = useState("");
+  const [userSearchQuery, setUserSearchQuery] = useState("");
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -120,9 +118,7 @@ export function LiveChat() {
         (payload) => {
           const newMsg = payload.new as ChatMessage;
           
-          // Check if this message is for us
           if (newMsg.recipient_id === user?.id || newMsg.sender_id === user?.id) {
-            // Refresh conversations and messages
             loadConversations();
             if (selectedConversation) {
               loadMessages(selectedConversation);
@@ -174,7 +170,7 @@ export function LiveChat() {
         groups = groupsData || [];
       }
 
-      // Load 1-1 conversations (distinct users we've messaged with)
+      // Load 1-1 conversations
       const { data: messagesData } = await supabase
         .from("chat_messages")
         .select("*")
@@ -182,28 +178,31 @@ export function LiveChat() {
         .is("group_id", null)
         .order("created_at", { ascending: false });
 
-      // Get unique users from messages
       const userIds = new Set<string>();
       (messagesData || []).forEach(msg => {
         if (msg.sender_id !== user.id) userIds.add(msg.sender_id);
         if (msg.recipient_id && msg.recipient_id !== user.id) userIds.add(msg.recipient_id);
       });
 
-      // Build conversation list
       const convList: Conversation[] = [];
 
       // Add groups first
       for (const group of groups) {
-        const groupMessages = (messagesData || []).filter(m => m.group_id === group.id);
-        const lastMessage = groupMessages[0];
-        const unreadCount = groupMessages.filter(m => !m.is_read && m.sender_id !== user.id).length;
+        const { data: groupMsgs } = await supabase
+          .from("chat_messages")
+          .select("*")
+          .eq("group_id", group.id)
+          .order("created_at", { ascending: false })
+          .limit(1);
+        
+        const lastMessage = groupMsgs?.[0];
 
         convList.push({
           id: group.id,
           type: "group",
           name: group.name,
           lastMessage,
-          unreadCount,
+          unreadCount: 0,
         });
       }
 
@@ -227,8 +226,10 @@ export function LiveChat() {
         });
       }
 
-      // Sort by last message time
+      // Sort by last message time, groups first
       convList.sort((a, b) => {
+        if (a.type === "group" && b.type !== "group") return -1;
+        if (a.type !== "group" && b.type === "group") return 1;
         const timeA = a.lastMessage?.created_at || "";
         const timeB = b.lastMessage?.created_at || "";
         return timeB.localeCompare(timeA);
@@ -260,7 +261,6 @@ export function LiveChat() {
 
       if (error) throw error;
 
-      // Get sender names
       const senderIds = [...new Set((data || []).map(m => m.sender_id))];
       const { data: profiles } = await supabase
         .from("profiles")
@@ -274,7 +274,6 @@ export function LiveChat() {
 
       setMessages(messagesWithNames);
 
-      // Mark messages as read
       const unreadIds = (data || [])
         .filter(m => !m.is_read && m.sender_id !== user.id)
         .map(m => m.id);
@@ -325,18 +324,47 @@ export function LiveChat() {
     }
   };
 
-  const handleCreateGroup = async () => {
-    if (!user || !groupName.trim() || selectedMembers.length === 0) {
-      toast.error("Grup adı ve en az bir üye gerekli");
+  const handleCreateMessageOrGroup = async () => {
+    if (!user || selectedMembers.length === 0) {
+      toast.error("En az bir kişi seçin");
       return;
     }
 
     try {
+      // If only one member selected, start direct conversation
+      if (selectedMembers.length === 1) {
+        const userId = selectedMembers[0];
+        const userProfile = allUsers.find(u => u.user_id === userId);
+        if (!userProfile) return;
+
+        const newConv: Conversation = {
+          id: userId,
+          type: "user",
+          name: userProfile.full_name,
+          unreadCount: 0,
+        };
+
+        setSelectedConversation(newConv);
+        setMessages([]);
+        setIsCreateDialogOpen(false);
+        setSelectedMembers([]);
+        setGroupName("");
+        setUserSearchQuery("");
+        return;
+      }
+
+      // Multiple members - create group
+      const finalGroupName = groupName.trim() || selectedMembers
+        .map(id => allUsers.find(u => u.user_id === id)?.full_name)
+        .filter(Boolean)
+        .slice(0, 3)
+        .join(", ");
+
       // Create group
       const { data: group, error: groupError } = await supabase
         .from("chat_groups")
         .insert({
-          name: groupName.trim(),
+          name: finalGroupName,
           created_by: user.id,
         })
         .select()
@@ -357,13 +385,24 @@ export function LiveChat() {
       if (membersError) throw membersError;
 
       toast.success("Grup oluşturuldu");
-      setIsCreateGroupOpen(false);
+      setIsCreateDialogOpen(false);
       setGroupName("");
       setSelectedMembers([]);
+      setUserSearchQuery("");
       loadConversations();
+      
+      // Open the new group
+      const newConv: Conversation = {
+        id: group.id,
+        type: "group",
+        name: finalGroupName,
+        unreadCount: 0,
+      };
+      setSelectedConversation(newConv);
+      setMessages([]);
     } catch (error) {
       console.error("Error creating group:", error);
-      toast.error("Grup oluşturulamadı");
+      toast.error("Oluşturulamadı");
     }
   };
 
@@ -420,6 +459,14 @@ export function LiveChat() {
     return conversations.filter(c => c.name.toLowerCase().includes(query));
   }, [conversations, searchQuery]);
 
+  const filteredDialogUsers = useMemo(() => {
+    if (!userSearchQuery.trim()) return allUsers;
+    const query = userSearchQuery.toLowerCase();
+    return allUsers.filter(
+      u => u.full_name.toLowerCase().includes(query) || u.username.toLowerCase().includes(query)
+    );
+  }, [allUsers, userSearchQuery]);
+
   const totalUnread = conversations.reduce((acc, c) => acc + c.unreadCount, 0);
 
   return (
@@ -443,9 +490,12 @@ export function LiveChat() {
         </Button>
       </div>
 
-      {/* Chat Panel */}
+      {/* Chat Panel - Semi-transparent */}
       <Sheet open={isOpen} onOpenChange={setIsOpen}>
-        <SheetContent side="right" className="w-full sm:w-[420px] p-0 flex flex-col">
+        <SheetContent 
+          side="right" 
+          className="w-full sm:w-[380px] p-0 flex flex-col bg-background/80 backdrop-blur-xl border-l border-border/50"
+        >
           {selectedConversation ? (
             // Chat View
             <>
@@ -562,7 +612,7 @@ export function LiveChat() {
                 </div>
               </ScrollArea>
 
-              <div className="p-4 border-t bg-background">
+              <div className="p-4 border-t bg-background/50">
                 <form
                   onSubmit={(e) => {
                     e.preventDefault();
@@ -575,7 +625,7 @@ export function LiveChat() {
                     value={newMessage}
                     onChange={(e) => setNewMessage(e.target.value)}
                     placeholder="Mesaj yazın..."
-                    className="flex-1"
+                    className="flex-1 bg-background"
                     disabled={isSending}
                   />
                   <Button type="submit" size="icon" disabled={isSending || !newMessage.trim()}>
@@ -591,21 +641,21 @@ export function LiveChat() {
           ) : (
             // Conversations List
             <>
-              <SheetHeader className="p-4 border-b">
-                <SheetTitle className="flex items-center gap-2">
+              <div className="p-4 border-b bg-muted/30">
+                <h2 className="font-semibold flex items-center gap-2">
                   <MessageCircle className="h-5 w-5" />
                   Canlı Sohbet
-                </SheetTitle>
-              </SheetHeader>
+                </h2>
+              </div>
 
-              <div className="p-4 border-b space-y-3">
+              <div className="p-3 border-b space-y-2">
                 <div className="relative">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                   <Input
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     placeholder="Kullanıcı veya grup ara..."
-                    className="pl-9"
+                    className="pl-9 bg-background"
                   />
                   {searchQuery && (
                     <Button
@@ -621,10 +671,10 @@ export function LiveChat() {
                 <Button
                   variant="outline"
                   className="w-full gap-2"
-                  onClick={() => setIsCreateGroupOpen(true)}
+                  onClick={() => setIsCreateDialogOpen(true)}
                 >
                   <Plus className="h-4 w-4" />
-                  Yeni Grup Oluştur
+                  Yeni Mesaj
                 </Button>
               </div>
 
@@ -662,7 +712,7 @@ export function LiveChat() {
                       <div className="text-center py-8 text-muted-foreground">
                         <Users className="h-12 w-12 mx-auto mb-3 opacity-30" />
                         <p>Henüz sohbet yok</p>
-                        <p className="text-sm">Kullanıcı arayarak başlayın</p>
+                        <p className="text-sm">Yeni Mesaj ile başlayın</p>
                       </div>
                     ) : (
                       filteredConversations.map((conv) => (
@@ -674,7 +724,7 @@ export function LiveChat() {
                           }}
                           className="w-full p-3 flex items-center gap-3 rounded-lg hover:bg-muted transition-colors"
                         >
-                          <Avatar className="h-12 w-12">
+                          <Avatar className="h-11 w-11">
                             <AvatarFallback className={conv.type === "group" ? "bg-primary text-primary-foreground" : ""}>
                               {conv.type === "group" ? (
                                 <Users className="h-5 w-5" />
@@ -714,32 +764,49 @@ export function LiveChat() {
         </SheetContent>
       </Sheet>
 
-      {/* Create Group Dialog */}
-      <Dialog open={isCreateGroupOpen} onOpenChange={setIsCreateGroupOpen}>
+      {/* Create Message/Group Dialog */}
+      <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <Users className="h-5 w-5" />
-              Yeni Grup Oluştur
+              <MessageCircle className="h-5 w-5" />
+              Yeni Mesaj
             </DialogTitle>
+            <DialogDescription>
+              Bir kişi seçerek mesaj gönderin veya birden fazla kişi seçerek grup oluşturun.
+            </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4">
-            <div>
-              <label className="text-sm font-medium mb-2 block">Grup Adı</label>
+            {/* User Search */}
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
-                value={groupName}
-                onChange={(e) => setGroupName(e.target.value)}
-                placeholder="Grup adı girin..."
+                value={userSearchQuery}
+                onChange={(e) => setUserSearchQuery(e.target.value)}
+                placeholder="İsim veya kullanıcı adı ara..."
+                className="pl-9"
               />
             </div>
 
+            {/* Group Name (shown if more than 1 selected) */}
+            {selectedMembers.length > 1 && (
+              <div>
+                <label className="text-sm font-medium mb-2 block">Grup Adı (opsiyonel)</label>
+                <Input
+                  value={groupName}
+                  onChange={(e) => setGroupName(e.target.value)}
+                  placeholder="Grup adı girin..."
+                />
+              </div>
+            )}
+
             <div>
               <label className="text-sm font-medium mb-2 block">
-                Üyeler ({selectedMembers.length} seçildi)
+                Kişiler ({selectedMembers.length} seçildi)
               </label>
-              <ScrollArea className="h-[200px] border rounded-lg p-2">
-                {allUsers.map((u) => (
+              <ScrollArea className="h-[250px] border rounded-lg p-2">
+                {filteredDialogUsers.map((u) => (
                   <label
                     key={u.user_id}
                     className="flex items-center gap-3 p-2 rounded-lg hover:bg-muted cursor-pointer"
@@ -768,12 +835,26 @@ export function LiveChat() {
           </div>
 
           <DialogFooter>
-            <Button variant="outline" onClick={() => setIsCreateGroupOpen(false)}>
+            <Button variant="outline" onClick={() => {
+              setIsCreateDialogOpen(false);
+              setSelectedMembers([]);
+              setGroupName("");
+              setUserSearchQuery("");
+            }}>
               İptal
             </Button>
-            <Button onClick={handleCreateGroup} disabled={!groupName.trim() || selectedMembers.length === 0}>
-              <Plus className="h-4 w-4 mr-1" />
-              Oluştur
+            <Button onClick={handleCreateMessageOrGroup} disabled={selectedMembers.length === 0}>
+              {selectedMembers.length > 1 ? (
+                <>
+                  <Users className="h-4 w-4 mr-1" />
+                  Grup Oluştur
+                </>
+              ) : (
+                <>
+                  <MessageCircle className="h-4 w-4 mr-1" />
+                  Mesaj Gönder
+                </>
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>
