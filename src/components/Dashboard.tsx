@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { 
   Plus, X, Calendar, Clock, AlertTriangle, 
   StickyNote, Trash2, Mail, MailOpen, Check, Reply,
-  Send, User, GripVertical, Loader2
+  Send, User, GripVertical, Loader2, Zap, BarChart3
 } from "lucide-react";
 import { 
   Select,
@@ -28,6 +28,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
 import { format, differenceInDays, isPast, isToday } from "date-fns";
 import { tr } from "date-fns/locale";
+import { useNavigate } from "react-router-dom";
 
 interface StickyNoteData {
   id: string;
@@ -51,8 +52,11 @@ interface OrderWithTermin {
   id: string;
   order_name: string;
   termin_date: string | null;
+  po_termin_date: string | null;
+  fabric_termin_date: string | null;
   status: string;
   fabric_type: string | null;
+  is_fast_track: boolean;
 }
 
 interface UserProfile {
@@ -71,9 +75,11 @@ const noteColors = [
 
 export function Dashboard() {
   const { user, isAdmin } = useAuth();
+  const navigate = useNavigate();
   const [myNotes, setMyNotes] = useState<StickyNoteData[]>([]);
   const [receivedNotes, setReceivedNotes] = useState<StickyNoteData[]>([]);
   const [upcomingOrders, setUpcomingOrders] = useState<OrderWithTermin[]>([]);
+  const [ftOrders, setFtOrders] = useState<OrderWithTermin[]>([]);
   const [allUsers, setAllUsers] = useState<UserProfile[]>([]);
   const [isLoadingNotes, setIsLoadingNotes] = useState(true);
   const [isLoadingOrders, setIsLoadingOrders] = useState(true);
@@ -177,18 +183,38 @@ export function Dashboard() {
     if (!user) return;
     
     try {
+      // Load upcoming orders (not FT specific)
       const { data, error } = await supabase
         .from("orders")
-        .select("id, order_name, termin_date, status, fabric_type")
+        .select("id, order_name, termin_date, po_termin_date, fabric_termin_date, status, fabric_type, is_fast_track")
         .eq("user_id", user.id)
-        .not("termin_date", "is", null)
         .neq("status", "completed")
         .neq("status", "cancelled")
-        .order("termin_date", { ascending: true })
+        .order("po_termin_date", { ascending: true, nullsFirst: false })
         .limit(10);
 
       if (error) throw error;
-      setUpcomingOrders(data || []);
+      
+      const mappedOrders = (data || []).map((o: any) => ({
+        ...o,
+        is_fast_track: o.is_fast_track || false,
+      }));
+      
+      setUpcomingOrders(mappedOrders.filter((o: any) => !o.is_fast_track));
+      
+      // Load ALL FT orders (from all users) - these are important
+      const { data: allFtData, error: ftError } = await supabase
+        .from("orders")
+        .select("id, order_name, termin_date, po_termin_date, fabric_termin_date, status, fabric_type, is_fast_track")
+        .eq("is_fast_track", true)
+        .neq("status", "completed")
+        .neq("status", "cancelled")
+        .order("po_termin_date", { ascending: true, nullsFirst: false })
+        .limit(20);
+        
+      if (!ftError) {
+        setFtOrders(allFtData || []);
+      }
     } catch (error) {
       console.error("Error loading orders:", error);
     } finally {
@@ -417,7 +443,109 @@ export function Dashboard() {
 
   return (
     <div className="space-y-6">
-      {/* Gelen Notlar (Mektup Görünümü) */}
+      {/* Grid: Gelen Notlar + FT Siparişler */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Gelen Notlar (Mektup Görünümü) */}
+        <Card className="glass-card border-primary/20">
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center gap-2 text-lg">
+              <Mail className="h-5 w-5 text-primary" />
+              Gelen Notlar
+              <Badge variant="secondary" className="ml-2">
+                {receivedNotes.filter(n => !n.is_completed).length}
+              </Badge>
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="max-h-[400px] overflow-y-auto">
+            {receivedNotes.filter(n => !n.is_completed).length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                <Mail className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                <p>Gelen not bulunmuyor</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {receivedNotes.filter(n => !n.is_completed).map((note) => {
+                  const colorClasses = getNoteColorClasses(note.color);
+                  return (
+                    <div 
+                      key={note.id}
+                      className={`relative p-3 rounded-lg border ${colorClasses.bg} ${colorClasses.border} shadow-sm`}
+                      onClick={() => handleMarkAsRead(note)}
+                    >
+                      <div className="flex items-start gap-2">
+                        {note.is_read ? (
+                          <MailOpen className="h-4 w-4 text-muted-foreground mt-1" />
+                        ) : (
+                          <Mail className="h-4 w-4 text-primary animate-pulse mt-1" />
+                        )}
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs text-muted-foreground">{note.sender_name}</p>
+                          <h4 className={`font-medium text-sm ${colorClasses.text}`}>{note.title}</h4>
+                          <p className={`text-xs ${colorClasses.text} opacity-70 truncate`}>{note.content}</p>
+                        </div>
+                      </div>
+                      <div className="flex gap-2 mt-2">
+                        <Button size="sm" variant="outline" className="flex-1 h-7 text-xs" onClick={(e) => { e.stopPropagation(); setReplyingNote(note); }}>
+                          <Reply className="h-3 w-3 mr-1" /> Cevapla
+                        </Button>
+                        <Button size="sm" variant="secondary" className="h-7 text-xs" onClick={(e) => { e.stopPropagation(); handleCloseNote(note); }}>
+                          <X className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* FT Siparişler */}
+        <Card className="glass-card border-amber-400/50 bg-amber-50/30 dark:bg-amber-950/20">
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <CardTitle className="flex items-center gap-2 text-lg">
+                <Zap className="h-5 w-5 text-amber-500" />
+                Fast Track Siparişler
+                <Badge className="ml-2 bg-amber-500/20 text-amber-700">{ftOrders.length}</Badge>
+              </CardTitle>
+              <Button variant="outline" size="sm" onClick={() => navigate("/reports")} className="gap-1">
+                <BarChart3 className="h-4 w-4" /> Raporlar
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent className="max-h-[400px] overflow-y-auto">
+            {isLoadingOrders ? (
+              <div className="text-center py-4"><Loader2 className="h-6 w-6 animate-spin mx-auto" /></div>
+            ) : ftOrders.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                <Zap className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                <p>FT sipariş bulunmuyor</p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {ftOrders.map((order) => (
+                  <div key={order.id} className="flex items-center justify-between p-3 rounded-lg bg-amber-100/50 dark:bg-amber-900/30 border border-amber-300/50">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <Zap className="h-4 w-4 text-amber-500" />
+                        <p className="font-medium text-sm truncate">{order.order_name}</p>
+                      </div>
+                      {order.fabric_type && <p className="text-xs text-muted-foreground truncate">{order.fabric_type}</p>}
+                      {order.po_termin_date && (
+                        <p className="text-xs text-muted-foreground">PO: {format(new Date(order.po_termin_date), "d MMM", { locale: tr })}</p>
+                      )}
+                    </div>
+                    {getTerminBadge(order.po_termin_date)}
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Termin Yaklaşan Siparişler */}
       {receivedNotes.filter(n => !n.is_completed).length > 0 && (
         <Card className="glass-card border-primary/20">
           <CardHeader className="pb-3">

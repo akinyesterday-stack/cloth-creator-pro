@@ -184,13 +184,17 @@ export type Database = {
           created_at: string
           description: string | null
           en: number | null
+          fabric_termin_date: string | null
           fabric_type: string | null
           gramaj: number | null
           id: string
+          is_fast_track: boolean
           items: Json
           model_image: string | null
           order_name: string
+          po_termin_date: string | null
           price: number | null
+          shipped_date: string | null
           status: string
           termin_date: string | null
           total_amount: number
@@ -202,13 +206,17 @@ export type Database = {
           created_at?: string
           description?: string | null
           en?: number | null
+          fabric_termin_date?: string | null
           fabric_type?: string | null
           gramaj?: number | null
           id?: string
+          is_fast_track?: boolean
           items?: Json
           model_image?: string | null
           order_name: string
+          po_termin_date?: string | null
           price?: number | null
+          shipped_date?: string | null
           status?: string
           termin_date?: string | null
           total_amount?: number
@@ -220,13 +228,17 @@ export type Database = {
           created_at?: string
           description?: string | null
           en?: number | null
+          fabric_termin_date?: string | null
           fabric_type?: string | null
           gramaj?: number | null
           id?: string
+          is_fast_track?: boolean
           items?: Json
           model_image?: string | null
           order_name?: string
+          po_termin_date?: string | null
           price?: number | null
+          shipped_date?: string | null
           status?: string
           termin_date?: string | null
           total_amount?: number

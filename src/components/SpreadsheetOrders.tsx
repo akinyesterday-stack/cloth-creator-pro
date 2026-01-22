@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { 
   Plus, Trash2, Save, Download, FileSpreadsheet, 
-  Calendar, ArrowUpDown, Loader2
+  ArrowUpDown, Loader2, Zap
 } from "lucide-react";
 import {
   Table,
@@ -22,12 +22,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
 import ExcelJS from "exceljs";
 import { format } from "date-fns";
-import { tr } from "date-fns/locale";
 
 interface OrderRow {
   id: string;
@@ -39,8 +39,12 @@ interface OrderRow {
   gramaj: number | null;
   price: number | null;
   termin_date: string | null;
+  fabric_termin_date: string | null;
+  po_termin_date: string | null;
+  shipped_date: string | null;
   status: string;
   description: string | null;
+  is_fast_track: boolean;
   isNew?: boolean;
   isModified?: boolean;
 }
@@ -77,7 +81,7 @@ export function SpreadsheetOrders() {
 
       if (error) throw error;
 
-      const mappedData: OrderRow[] = (data || []).map((order) => ({
+      const mappedData: OrderRow[] = (data || []).map((order: any) => ({
         id: order.id,
         order_name: order.order_name,
         model_image: order.model_image,
@@ -87,8 +91,12 @@ export function SpreadsheetOrders() {
         gramaj: order.gramaj,
         price: order.price,
         termin_date: order.termin_date,
+        fabric_termin_date: order.fabric_termin_date || null,
+        po_termin_date: order.po_termin_date || null,
+        shipped_date: order.shipped_date || null,
         status: order.status,
         description: order.description,
+        is_fast_track: order.is_fast_track || false,
         isNew: false,
         isModified: false,
       }));
@@ -113,15 +121,19 @@ export function SpreadsheetOrders() {
       gramaj: null,
       price: null,
       termin_date: null,
+      fabric_termin_date: null,
+      po_termin_date: null,
+      shipped_date: null,
       status: "pending",
       description: null,
+      is_fast_track: false,
       isNew: true,
       isModified: false,
     };
     setRows([...rows, newRow]);
   };
 
-  const handleCellChange = (rowId: string, field: keyof OrderRow, value: string | number | null) => {
+  const handleCellChange = (rowId: string, field: keyof OrderRow, value: any) => {
     setRows(rows.map(row => {
       if (row.id === rowId) {
         return { ...row, [field]: value, isModified: true };
@@ -162,7 +174,7 @@ export function SpreadsheetOrders() {
       const modifiedRows = rows.filter(r => r.isModified || r.isNew);
       
       for (const row of modifiedRows) {
-        const orderData = {
+        const orderData: any = {
           user_id: user.id,
           order_name: row.order_name || "İsimsiz Sipariş",
           model_image: row.model_image,
@@ -172,8 +184,12 @@ export function SpreadsheetOrders() {
           gramaj: row.gramaj,
           price: row.price || 0,
           termin_date: row.termin_date,
+          fabric_termin_date: row.fabric_termin_date,
+          po_termin_date: row.po_termin_date,
+          shipped_date: row.shipped_date,
           status: row.status,
           description: row.description,
+          is_fast_track: row.is_fast_track,
         };
 
         if (row.isNew) {
@@ -185,7 +201,6 @@ export function SpreadsheetOrders() {
 
           if (error) throw error;
           
-          // Update the row id
           setRows(prev => prev.map(r => 
             r.id === row.id 
               ? { ...r, id: data.id, isNew: false, isModified: false }
@@ -231,19 +246,20 @@ export function SpreadsheetOrders() {
     });
 
     worksheet.columns = [
-      { header: "Resim", key: "resim", width: 20 },
+      { header: "FT", key: "ft", width: 8 },
       { header: "Model Adı", key: "modelAdi", width: 25 },
       { header: "Kumaş Türü", key: "kumasTuru", width: 30 },
       { header: "Kullanım Yeri", key: "kullanimYeri", width: 25 },
       { header: "En (CM)", key: "en", width: 12 },
       { header: "Gramaj (GR)", key: "gramaj", width: 12 },
       { header: "Fiyat (₺)", key: "fiyat", width: 12 },
-      { header: "Termin", key: "termin", width: 15 },
+      { header: "Kumaş Termin", key: "kumasTermin", width: 15 },
+      { header: "PO Termin", key: "poTermin", width: 15 },
+      { header: "Yüklenme Tarihi", key: "yuklenme", width: 15 },
       { header: "Durum", key: "durum", width: 15 },
       { header: "Açıklama", key: "aciklama", width: 30 },
     ];
 
-    // Header styling
     const headerRow = worksheet.getRow(1);
     headerRow.height = 25;
     headerRow.eachCell((cell) => {
@@ -262,25 +278,26 @@ export function SpreadsheetOrders() {
       };
     });
 
-    // Data rows
     for (const row of rows) {
       const statusLabel = statusOptions.find(s => s.value === row.status)?.label || row.status;
       
       const dataRow = worksheet.addRow({
-        resim: "",
+        ft: row.is_fast_track ? "⚡ FT" : "",
         modelAdi: row.order_name,
         kumasTuru: row.fabric_type || "",
         kullanimYeri: row.usage_area || "",
         en: row.en || "",
         gramaj: row.gramaj || "",
         fiyat: row.price || "",
-        termin: row.termin_date ? format(new Date(row.termin_date), "d.MM.yyyy") : "",
+        kumasTermin: row.fabric_termin_date ? format(new Date(row.fabric_termin_date), "d.MM.yyyy") : "",
+        poTermin: row.po_termin_date ? format(new Date(row.po_termin_date), "d.MM.yyyy") : "",
+        yuklenme: row.shipped_date ? format(new Date(row.shipped_date), "d.MM.yyyy") : "",
         durum: statusLabel,
         aciklama: row.description || "",
       });
 
       dataRow.height = 30;
-      dataRow.eachCell((cell) => {
+      dataRow.eachCell((cell, colNumber) => {
         cell.alignment = { horizontal: "center", vertical: "middle", wrapText: true };
         cell.border = {
           top: { style: "thin", color: { argb: "D1D5DB" } },
@@ -288,27 +305,16 @@ export function SpreadsheetOrders() {
           left: { style: "thin", color: { argb: "D1D5DB" } },
           right: { style: "thin", color: { argb: "D1D5DB" } },
         };
-      });
-
-      // Add image if exists
-      if (row.model_image) {
-        try {
-          const base64Match = row.model_image.match(/^data:image\/(png|jpeg|jpg|gif);base64,(.+)$/);
-          if (base64Match) {
-            const extension = (base64Match[1] === "jpg" ? "jpeg" : base64Match[1]) as "png" | "jpeg" | "gif";
-            const imageId = workbook.addImage({
-              base64: base64Match[2],
-              extension,
-            });
-            worksheet.addImage(imageId, {
-              tl: { col: 0.1, row: dataRow.number - 1 + 0.1 },
-              ext: { width: 80, height: 50 },
-            });
-          }
-        } catch (error) {
-          console.error("Image error:", error);
+        
+        // Highlight FT rows
+        if (row.is_fast_track) {
+          cell.fill = {
+            type: "pattern",
+            pattern: "solid",
+            fgColor: { argb: "FEF3C7" },
+          };
         }
-      }
+      });
     }
 
     const buffer = await workbook.xlsx.writeBuffer();
@@ -399,22 +405,25 @@ export function SpreadsheetOrders() {
           <TableHeader>
             <TableRow className="bg-muted/50">
               <TableHead className="w-[40px]"></TableHead>
-              <TableHead className="min-w-[150px]">Model Adı</TableHead>
-              <TableHead className="min-w-[150px]">Kumaş Türü</TableHead>
-              <TableHead className="min-w-[130px]">Kullanım Yeri</TableHead>
-              <TableHead className="w-[80px]">En</TableHead>
-              <TableHead className="w-[80px]">Gramaj</TableHead>
-              <TableHead className="w-[90px]">Fiyat</TableHead>
-              <TableHead className="w-[130px]">Termin</TableHead>
-              <TableHead className="w-[120px]">Durum</TableHead>
-              <TableHead className="min-w-[150px]">Açıklama</TableHead>
+              <TableHead className="w-[50px] text-center">FT</TableHead>
+              <TableHead className="min-w-[130px]">Model Adı</TableHead>
+              <TableHead className="min-w-[130px]">Kumaş Türü</TableHead>
+              <TableHead className="min-w-[110px]">Kullanım Yeri</TableHead>
+              <TableHead className="w-[70px]">En</TableHead>
+              <TableHead className="w-[70px]">Gramaj</TableHead>
+              <TableHead className="w-[80px]">Fiyat</TableHead>
+              <TableHead className="w-[120px]">Kumaş Termin</TableHead>
+              <TableHead className="w-[120px]">PO Termin</TableHead>
+              <TableHead className="w-[120px]">Yüklenme</TableHead>
+              <TableHead className="w-[110px]">Durum</TableHead>
+              <TableHead className="min-w-[120px]">Açıklama</TableHead>
               <TableHead className="w-[50px]"></TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {rows.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={11} className="text-center py-8 text-muted-foreground">
+                <TableCell colSpan={14} className="text-center py-8 text-muted-foreground">
                   Henüz sipariş bulunmuyor. "Yeni Satır" butonuna tıklayın.
                 </TableCell>
               </TableRow>
@@ -425,12 +434,21 @@ export function SpreadsheetOrders() {
                   className={`
                     ${row.isNew ? "bg-green-50 dark:bg-green-950/20" : ""}
                     ${row.isModified && !row.isNew ? "bg-yellow-50 dark:bg-yellow-950/20" : ""}
+                    ${row.is_fast_track ? "bg-amber-50 dark:bg-amber-950/20" : ""}
                   `}
                 >
                   <TableCell className="px-2">
                     {(row.isNew || row.isModified) && (
                       <div className={`w-2 h-2 rounded-full ${row.isNew ? "bg-green-500" : "bg-yellow-500"}`} />
                     )}
+                  </TableCell>
+                  <TableCell className="text-center">
+                    <Checkbox
+                      checked={row.is_fast_track}
+                      onCheckedChange={(checked) => handleCellChange(row.id, "is_fast_track", checked)}
+                      className="data-[state=checked]:bg-amber-500 data-[state=checked]:border-amber-500"
+                    />
+                    {row.is_fast_track && <Zap className="h-3 w-3 text-amber-500 mx-auto mt-1" />}
                   </TableCell>
                   <TableCell>
                     <Input
@@ -487,8 +505,24 @@ export function SpreadsheetOrders() {
                   <TableCell>
                     <Input
                       type="date"
-                      value={row.termin_date || ""}
-                      onChange={(e) => handleCellChange(row.id, "termin_date", e.target.value || null)}
+                      value={row.fabric_termin_date || ""}
+                      onChange={(e) => handleCellChange(row.id, "fabric_termin_date", e.target.value || null)}
+                      className="h-8 text-sm border-0 bg-transparent focus:bg-background focus:border"
+                    />
+                  </TableCell>
+                  <TableCell>
+                    <Input
+                      type="date"
+                      value={row.po_termin_date || ""}
+                      onChange={(e) => handleCellChange(row.id, "po_termin_date", e.target.value || null)}
+                      className="h-8 text-sm border-0 bg-transparent focus:bg-background focus:border"
+                    />
+                  </TableCell>
+                  <TableCell>
+                    <Input
+                      type="date"
+                      value={row.shipped_date || ""}
+                      onChange={(e) => handleCellChange(row.id, "shipped_date", e.target.value || null)}
                       className="h-8 text-sm border-0 bg-transparent focus:bg-background focus:border"
                     />
                   </TableCell>
@@ -498,14 +532,18 @@ export function SpreadsheetOrders() {
                       onValueChange={(value) => handleCellChange(row.id, "status", value)}
                     >
                       <SelectTrigger className="h-8 text-xs border-0 bg-transparent focus:bg-background">
-                        <Badge className={`${getStatusColor(row.status)} text-xs`}>
-                          {statusOptions.find(s => s.value === row.status)?.label}
-                        </Badge>
+                        <SelectValue>
+                          <Badge className={`${getStatusColor(row.status)} text-xs`}>
+                            {statusOptions.find(s => s.value === row.status)?.label}
+                          </Badge>
+                        </SelectValue>
                       </SelectTrigger>
                       <SelectContent>
-                        {statusOptions.map((opt) => (
-                          <SelectItem key={opt.value} value={opt.value}>
-                            <Badge className={`${opt.color} text-xs`}>{opt.label}</Badge>
+                        {statusOptions.map((status) => (
+                          <SelectItem key={status.value} value={status.value}>
+                            <Badge className={`${status.color} text-xs`}>
+                              {status.label}
+                            </Badge>
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -519,11 +557,11 @@ export function SpreadsheetOrders() {
                       className="h-8 text-sm border-0 bg-transparent focus:bg-background focus:border"
                     />
                   </TableCell>
-                  <TableCell>
+                  <TableCell className="px-2">
                     <Button
                       variant="ghost"
-                      size="icon"
-                      className="h-7 w-7 text-destructive hover:text-destructive"
+                      size="sm"
+                      className="h-7 w-7 p-0 text-destructive hover:text-destructive"
                       onClick={() => handleDeleteRow(row.id)}
                     >
                       <Trash2 className="h-4 w-4" />
