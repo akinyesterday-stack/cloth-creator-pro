@@ -6,11 +6,12 @@ import { Button } from "@/components/ui/button";
 import { SearchableCombobox } from "@/components/SearchableCombobox";
 import { FabricManager, FabricTypeWithSpec } from "@/components/FabricManager";
 import { fabricTypesWithSpecs as defaultFabricTypes, usageAreas as defaultUsageAreas } from "@/data/fabricData";
-import { Calculator, Plus, Trash2, FileSpreadsheet, Package, Image, Upload, X, Pencil, Check, Settings, Download, Loader2, Copy, Send, Save, Archive } from "lucide-react";
+import { Calculator, Plus, Trash2, FileSpreadsheet, Package, Image, Upload, X, Pencil, Check, Settings, Download, Loader2, Copy, Send, Save, Archive, Clock } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { RadioPlayer } from "@/components/RadioPlayer";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Checkbox } from "@/components/ui/checkbox";
 import ExcelJS from "exceljs";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -30,6 +31,7 @@ interface FabricItem {
   en: number;
   gramaj: number;
   fiyat: number;
+  priceExpected?: boolean; // Üreticiden fiyat bekleniyor
 }
 
 interface ModelGroup {
@@ -85,6 +87,22 @@ export const CostCalculator = forwardRef<HTMLDivElement, CostCalculatorProps>(fu
   // Copy to model dialog
   const [copyDialogOpen, setCopyDialogOpen] = useState(false);
   const [itemToCopy, setItemToCopy] = useState<{item: FabricItem, sourceModelId: string} | null>(null);
+  
+  // Multi-select and copy
+  const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
+  const [multiCopyDialogOpen, setMultiCopyDialogOpen] = useState(false);
+  const [newModelNameForCopy, setNewModelNameForCopy] = useState("");
+  
+  // Price expected state
+  const [priceExpected, setPriceExpected] = useState(false);
+  
+  // Recent items tracking
+  const [recentFabrics, setRecentFabrics] = useState<string[]>([]);
+  const [recentUsageAreas, setRecentUsageAreas] = useState<string[]>([]);
+  
+  // Excel export dialog
+  const [excelNameDialogOpen, setExcelNameDialogOpen] = useState(false);
+  const [excelFileName, setExcelFileName] = useState("");
 
   // Load user's fabric types, usage areas and prices from database
   useEffect(() => {
@@ -276,7 +294,10 @@ export const CostCalculator = forwardRef<HTMLDivElement, CostCalculatorProps>(fu
   };
 
   const handleAddItem = () => {
-    if (!activeModelId || !selectedFabric || !selectedUsage || fiyat <= 0) return;
+    if (!activeModelId || !selectedFabric || !selectedUsage) return;
+    
+    // Allow 0 price if priceExpected is true
+    if (!priceExpected && fiyat <= 0) return;
 
     const newItem: FabricItem = {
       id: Date.now().toString(),
@@ -284,7 +305,8 @@ export const CostCalculator = forwardRef<HTMLDivElement, CostCalculatorProps>(fu
       usageArea: selectedUsage,
       en,
       gramaj,
-      fiyat,
+      fiyat: priceExpected ? 0 : fiyat,
+      priceExpected,
     };
 
     setModels(models.map(model => 
@@ -308,12 +330,91 @@ export const CostCalculator = forwardRef<HTMLDivElement, CostCalculatorProps>(fu
       saveUsageAreas(updatedAreas);
     }
     
+    // Update recent items
+    setRecentFabrics(prev => {
+      const filtered = prev.filter(f => f !== selectedFabric);
+      return [selectedFabric, ...filtered].slice(0, 5);
+    });
+    setRecentUsageAreas(prev => {
+      const filtered = prev.filter(a => a !== selectedUsage);
+      return [selectedUsage, ...filtered].slice(0, 5);
+    });
+    
     // Reset form
     setSelectedFabric("");
     setSelectedUsage("");
     setEn(0);
     setGramaj(0);
     setFiyat(0);
+    setPriceExpected(false);
+  };
+
+  // Toggle item selection
+  const handleToggleItemSelection = (itemId: string) => {
+    setSelectedItems(prev => {
+      const next = new Set(prev);
+      if (next.has(itemId)) {
+        next.delete(itemId);
+      } else {
+        next.add(itemId);
+      }
+      return next;
+    });
+  };
+
+  // Select all items in active model
+  const handleSelectAllItems = () => {
+    if (!activeModel) return;
+    if (selectedItems.size === activeModel.items.length) {
+      setSelectedItems(new Set());
+    } else {
+      setSelectedItems(new Set(activeModel.items.map(i => i.id)));
+    }
+  };
+
+  // Copy selected items to a model
+  const handleCopySelectedToModel = (targetModelId: string) => {
+    if (!activeModel || selectedItems.size === 0) return;
+    
+    const itemsToCopy = activeModel.items.filter(i => selectedItems.has(i.id));
+    const newItems = itemsToCopy.map(item => ({
+      ...item,
+      id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+    }));
+    
+    setModels(models.map(model =>
+      model.id === targetModelId
+        ? { ...model, items: [...model.items, ...newItems] }
+        : model
+    ));
+    
+    setSelectedItems(new Set());
+    setMultiCopyDialogOpen(false);
+    toast.success(`${newItems.length} satır kopyalandı`);
+  };
+
+  // Create new model and copy selected items
+  const handleCopyToNewModel = () => {
+    if (!activeModel || selectedItems.size === 0 || !newModelNameForCopy.trim()) return;
+    
+    const itemsToCopy = activeModel.items.filter(i => selectedItems.has(i.id));
+    const newItems = itemsToCopy.map(item => ({
+      ...item,
+      id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+    }));
+    
+    const newModel: ModelGroup = {
+      id: Date.now().toString(),
+      modelName: newModelNameForCopy.trim(),
+      images: [],
+      items: newItems,
+    };
+    
+    setModels([...models, newModel]);
+    setSelectedItems(new Set());
+    setMultiCopyDialogOpen(false);
+    setNewModelNameForCopy("");
+    toast.success(`${newItems.length} satır yeni modele kopyalandı`);
   };
 
   const handleRemoveItem = (modelId: string, itemId: string) => {
@@ -1020,6 +1121,7 @@ export const CostCalculator = forwardRef<HTMLDivElement, CostCalculatorProps>(fu
                   placeholder="Kumaş seçin..."
                   searchPlaceholder="Kumaş ara..."
                   allowCustom={true}
+                  recentItems={recentFabrics}
                 />
               </div>
 
@@ -1032,6 +1134,7 @@ export const CostCalculator = forwardRef<HTMLDivElement, CostCalculatorProps>(fu
                   placeholder="Kullanım yeri seçin..."
                   searchPlaceholder="Kullanım yeri ara..."
                   allowCustom={true}
+                  recentItems={recentUsageAreas}
                 />
               </div>
 
@@ -1062,7 +1165,23 @@ export const CostCalculator = forwardRef<HTMLDivElement, CostCalculatorProps>(fu
               </div>
 
               <div className="space-y-3">
-                <Label htmlFor="fiyat" className="text-sm font-semibold text-foreground/80">Fiyat (₺)</Label>
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="fiyat" className="text-sm font-semibold text-foreground/80">Fiyat (₺)</Label>
+                  <label className="flex items-center gap-2 text-xs text-muted-foreground cursor-pointer">
+                    <Checkbox 
+                      checked={priceExpected}
+                      onCheckedChange={(checked) => {
+                        setPriceExpected(!!checked);
+                        if (checked) setFiyat(0);
+                      }}
+                      className="h-4 w-4"
+                    />
+                    <span className="flex items-center gap-1">
+                      <Clock className="h-3 w-3" />
+                      Üreticiden Bekleniyor
+                    </span>
+                  </label>
+                </div>
                 <Input
                   id="fiyat"
                   type="number"
@@ -1070,15 +1189,16 @@ export const CostCalculator = forwardRef<HTMLDivElement, CostCalculatorProps>(fu
                   step="0.01"
                   value={fiyat || ""}
                   onChange={(e) => setFiyat(Number(e.target.value))}
-                  placeholder="0.00"
+                  placeholder={priceExpected ? "Fiyat bekleniyor..." : "0.00"}
                   className="h-11 border-2 focus:border-primary transition-all duration-300"
+                  disabled={priceExpected}
                 />
               </div>
 
               <div className="flex items-end">
                 <Button
                   onClick={handleAddItem}
-                  disabled={!selectedFabric || !selectedUsage || fiyat <= 0}
+                  disabled={!selectedFabric || !selectedUsage || (!priceExpected && fiyat <= 0)}
                   className="w-full h-11 gradient-accent text-accent-foreground hover:opacity-90 shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-[1.02]"
                 >
                   <Plus className="h-5 w-5 mr-2" />

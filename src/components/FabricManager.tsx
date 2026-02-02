@@ -5,9 +5,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
-import { Settings, Plus, Trash2, Search, Shirt, MapPin, Upload, Pencil, Check, X, ClipboardPaste, Layers } from "lucide-react";
+import { Settings, Plus, Trash2, Search, Shirt, MapPin, Upload, Pencil, Check, X, ClipboardPaste, Layers, Filter } from "lucide-react";
 
 export interface FabricTypeWithSpec {
   name: string;
@@ -50,6 +50,11 @@ export function FabricManager({
   const [usageBulkImportOpen, setUsageBulkImportOpen] = useState(false);
   const [usageBulkPasteText, setUsageBulkPasteText] = useState("");
   const [parsedUsageBulkItems, setParsedUsageBulkItems] = useState<string[]>([]);
+
+  // Custom filter patterns
+  const [filterDialogOpen, setFilterDialogOpen] = useState(false);
+  const [customFilters, setCustomFilters] = useState<string[]>([]);
+  const [newFilter, setNewFilter] = useState("");
 
   const handleAddFabricType = () => {
     if (newFabricType.trim() && !fabricTypes.find(f => f.name === newFabricType.trim())) {
@@ -101,6 +106,21 @@ export function FabricManager({
     onUsageAreasChange(usageAreas.filter((a) => a !== area));
   };
 
+  // Check if line should be filtered (single A or custom patterns)
+  const shouldFilterLine = (line: string): boolean => {
+    // Single A filter - any line containing only "A" repeated
+    if (/^A+$/i.test(line.trim())) return true;
+    
+    // Custom filter patterns
+    for (const pattern of customFilters) {
+      if (line.toLowerCase().includes(pattern.toLowerCase())) {
+        return true;
+      }
+    }
+    
+    return false;
+  };
+
   // Bulk import handlers for fabrics
   const handleParseBulkText = () => {
     const lines = bulkPasteText.trim().split('\n').filter(line => line.trim());
@@ -113,7 +133,7 @@ export function FabricManager({
           gramaj: 0
         };
       })
-      .filter(item => !/A{3,}/i.test(item.name));
+      .filter(item => !shouldFilterLine(item.name));
     setParsedBulkItems(items);
   };
 
@@ -151,7 +171,7 @@ export function FabricManager({
         const parts = line.split(/[\t,;]/).map(p => p.trim());
         return parts[0] || line.trim();
       })
-      .filter(item => !/A{3,}/i.test(item));
+      .filter(item => !shouldFilterLine(item));
     setParsedUsageBulkItems(items);
   };
 
@@ -175,6 +195,18 @@ export function FabricManager({
     setParsedUsageBulkItems([]);
   };
 
+  // Custom filter handlers
+  const handleAddFilter = () => {
+    if (newFilter.trim() && !customFilters.includes(newFilter.trim())) {
+      setCustomFilters([...customFilters, newFilter.trim()]);
+      setNewFilter("");
+    }
+  };
+
+  const handleRemoveFilter = (filter: string) => {
+    setCustomFilters(customFilters.filter(f => f !== filter));
+  };
+
   const filteredFabricTypes = fabricTypes.filter((fabric) =>
     fabric.name.toLowerCase().includes(fabricSearch.toLowerCase())
   );
@@ -186,12 +218,67 @@ export function FabricManager({
   return (
     <Card className="modern-card overflow-hidden animate-fade-in">
       <CardHeader className="bg-gradient-to-r from-primary/10 via-primary/5 to-transparent border-b border-border/50 py-5">
-        <CardTitle className="text-xl flex items-center gap-4">
-          <div className="p-3 bg-primary/10 rounded-lg">
-            <Layers className="h-6 w-6 text-primary" />
-          </div>
-          <span className="font-semibold">Kumaş & Kullanım Yeri Yönetimi</span>
-        </CardTitle>
+        <div className="flex items-center justify-between">
+          <CardTitle className="text-xl flex items-center gap-4">
+            <div className="p-3 bg-primary/10 rounded-lg">
+              <Layers className="h-6 w-6 text-primary" />
+            </div>
+            <span className="font-semibold">Kumaş & Kullanım Yeri Yönetimi</span>
+          </CardTitle>
+          
+          {/* Filter Settings Button */}
+          <Dialog open={filterDialogOpen} onOpenChange={setFilterDialogOpen}>
+            <DialogTrigger asChild>
+              <Button variant="outline" size="sm" className="gap-2">
+                <Filter className="h-4 w-4" />
+                Filtre Ayarları
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2">
+                  <Filter className="h-5 w-5" />
+                  Otomatik Filtre Ayarları
+                </DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4">
+                <p className="text-sm text-muted-foreground">
+                  Toplu yüklemede bu kelimeleri içeren satırlar otomatik olarak silinir.
+                  Tek "A" harfi zaten varsayılan olarak filtrelenir.
+                </p>
+                
+                <div className="flex gap-2">
+                  <Input
+                    value={newFilter}
+                    onChange={(e) => setNewFilter(e.target.value)}
+                    placeholder="Filtre kelimesi..."
+                    onKeyDown={(e) => e.key === "Enter" && handleAddFilter()}
+                  />
+                  <Button onClick={handleAddFilter} disabled={!newFilter.trim()}>
+                    <Plus className="h-4 w-4" />
+                  </Button>
+                </div>
+                
+                <div className="flex flex-wrap gap-2">
+                  <div className="px-3 py-1.5 bg-muted rounded-full text-sm flex items-center gap-2">
+                    <span>A (varsayılan)</span>
+                  </div>
+                  {customFilters.map((filter) => (
+                    <div key={filter} className="px-3 py-1.5 bg-destructive/10 rounded-full text-sm flex items-center gap-2">
+                      <span>{filter}</span>
+                      <button onClick={() => handleRemoveFilter(filter)} className="text-destructive hover:text-destructive/80">
+                        <X className="h-3 w-3" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <DialogFooter>
+                <Button onClick={() => setFilterDialogOpen(false)}>Tamam</Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        </div>
       </CardHeader>
       <CardContent className="p-6">
         <Tabs defaultValue="fabrics" className="w-full">
@@ -293,7 +380,7 @@ export function FabricManager({
                         <div className="space-y-2">
                           <Label className="text-sm font-medium">Excel'den kopyaladığınız kumaş türlerini yapıştırın</Label>
                           <p className="text-xs text-muted-foreground">
-                            Her satır bir kumaş türü olacak. 3+ yanyana A harfi içeren satırlar otomatik filtrelenir.
+                            Her satır bir kumaş türü olacak. Tek "A" harfi ve özel filtreler içeren satırlar otomatik filtrelenir.
                           </p>
                         </div>
                         <Textarea
@@ -405,130 +492,112 @@ export function FabricManager({
                 value={fabricSearch}
                 onChange={(e) => setFabricSearch(e.target.value)}
                 placeholder="Kumaş türü ara..."
-                className="pl-12 h-12 bg-secondary/30 border-border/30 focus:border-primary"
+                className="pl-12 h-12 bg-background/50 border-border/30 focus:border-primary"
               />
             </div>
 
-            {/* List */}
-            <ScrollArea className="h-[450px] rounded-xl border border-border/30 bg-background/50 scrollbar-netflix">
+            {/* Fabric List */}
+            <ScrollArea className="h-[400px] rounded-xl border border-border/30 bg-gradient-to-br from-background/50 to-muted/20">
               <div className="p-4 space-y-2">
-                {/* Header */}
-                <div className="grid grid-cols-12 gap-2 px-4 py-3 bg-primary/10 rounded-lg text-xs font-semibold text-primary uppercase tracking-wide sticky top-0 z-10">
-                  <div className="col-span-6">Kumaş Türü</div>
-                  <div className="col-span-2 text-center">En (CM)</div>
-                  <div className="col-span-2 text-center">Gramaj (GR)</div>
-                  <div className="col-span-2 text-center">İşlem</div>
-                </div>
-
-                {filteredFabricTypes.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
-                    <Shirt className="h-12 w-12 mb-4 opacity-30" />
-                    <p>{fabricSearch ? "Sonuç bulunamadı" : "Henüz kumaş türü eklenmemiş"}</p>
-                  </div>
-                ) : (
-                  filteredFabricTypes.map((fabric, index) => {
-                    const originalIndex = fabricTypes.findIndex(f => f.name === fabric.name);
-                    const isEditing = editingFabricIndex === originalIndex;
-
-                    return (
-                      <div
-                        key={index}
-                        className="grid grid-cols-12 gap-2 items-center p-4 bg-secondary/30 rounded-lg border border-border/20 hover:border-primary/30 transition-all group"
-                      >
-                        {isEditing ? (
-                          <>
-                            <div className="col-span-6">
-                              <Input
-                                value={editFabricName}
-                                onChange={(e) => setEditFabricName(e.target.value)}
-                                className="h-10 text-sm bg-background/50"
-                              />
-                            </div>
-                            <div className="col-span-2">
-                              <Input
-                                type="number"
-                                value={editFabricEn || ''}
-                                onChange={(e) => setEditFabricEn(Number(e.target.value))}
-                                className="h-10 text-sm text-center bg-background/50"
-                              />
-                            </div>
-                            <div className="col-span-2">
-                              <Input
-                                type="number"
-                                value={editFabricGramaj || ''}
-                                onChange={(e) => setEditFabricGramaj(Number(e.target.value))}
-                                className="h-10 text-sm text-center bg-background/50"
-                              />
-                            </div>
-                            <div className="col-span-2 flex justify-center gap-1">
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => handleSaveEditFabric(originalIndex)}
-                                className="h-9 w-9 text-success hover:text-success hover:bg-success/10"
-                              >
-                                <Check className="h-4 w-4" />
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={handleCancelEditFabric}
-                                className="h-9 w-9 text-muted-foreground hover:text-foreground"
-                              >
-                                <X className="h-4 w-4" />
-                              </Button>
-                            </div>
-                          </>
-                        ) : (
-                          <>
-                            <div className="col-span-6">
-                              <span className="text-sm font-medium">{fabric.name}</span>
-                            </div>
-                            <div className="col-span-2 text-center">
-                              <span className="text-sm text-muted-foreground">{fabric.en || '-'}</span>
-                            </div>
-                            <div className="col-span-2 text-center">
-                              <span className="text-sm text-muted-foreground">{fabric.gramaj || '-'}</span>
-                            </div>
-                            <div className="col-span-2 flex justify-center gap-1">
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => handleStartEditFabric(originalIndex, fabric)}
-                                className="h-9 w-9 opacity-0 group-hover:opacity-100 text-primary hover:text-primary hover:bg-primary/10 transition-all"
-                              >
-                                <Pencil className="h-4 w-4" />
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => handleRemoveFabricType(fabric.name)}
-                                className="h-9 w-9 opacity-0 group-hover:opacity-100 text-destructive hover:text-destructive hover:bg-destructive/10 transition-all"
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            </div>
-                          </>
-                        )}
+                {filteredFabricTypes.map((fabric, index) => (
+                  <div 
+                    key={fabric.name} 
+                    className="group p-4 rounded-lg border border-border/30 bg-card/50 hover:border-primary/30 hover:bg-card transition-all duration-200"
+                  >
+                    {editingFabricIndex === index ? (
+                      <div className="grid grid-cols-12 gap-3 items-center">
+                        <div className="col-span-5">
+                          <Input
+                            value={editFabricName}
+                            onChange={(e) => setEditFabricName(e.target.value)}
+                            className="h-10"
+                          />
+                        </div>
+                        <div className="col-span-2">
+                          <Input
+                            type="number"
+                            value={editFabricEn || ''}
+                            onChange={(e) => setEditFabricEn(Number(e.target.value))}
+                            placeholder="En"
+                            className="h-10 text-center"
+                          />
+                        </div>
+                        <div className="col-span-2">
+                          <Input
+                            type="number"
+                            value={editFabricGramaj || ''}
+                            onChange={(e) => setEditFabricGramaj(Number(e.target.value))}
+                            placeholder="Gramaj"
+                            className="h-10 text-center"
+                          />
+                        </div>
+                        <div className="col-span-3 flex gap-2 justify-end">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleSaveEditFabric(index)}
+                            className="h-9 w-9 text-green-600 hover:text-green-700 hover:bg-green-100"
+                          >
+                            <Check className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={handleCancelEditFabric}
+                            className="h-9 w-9"
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </div>
                       </div>
-                    );
-                  })
-                )}
+                    ) : (
+                      <div className="flex items-center justify-between">
+                        <div className="flex-1">
+                          <span className="font-medium text-foreground">{fabric.name}</span>
+                          <div className="flex gap-4 mt-1 text-sm text-muted-foreground">
+                            <span>En: {fabric.en} CM</span>
+                            <span>Gramaj: {fabric.gramaj} GR</span>
+                          </div>
+                        </div>
+                        <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleStartEditFabric(index, fabric)}
+                            className="h-9 w-9 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleRemoveFabricType(fabric.name)}
+                            className="h-9 w-9 text-destructive hover:text-destructive hover:bg-destructive/10"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ))}
               </div>
             </ScrollArea>
           </TabsContent>
 
           <TabsContent value="usage" className="space-y-6 animate-fade-in">
             {/* Add New Usage Area */}
-            <div className="p-5 bg-secondary/30 rounded-xl border border-border/20">
-              <Label className="text-xs text-muted-foreground mb-2 block uppercase tracking-wide">Kullanım Yeri</Label>
-              <Input
-                value={newUsageArea}
-                onChange={(e) => setNewUsageArea(e.target.value)}
-                placeholder="Yeni kullanım yeri ekle..."
-                onKeyDown={(e) => e.key === "Enter" && handleAddUsageArea()}
-                className="h-12 bg-background/50 border-border/30 focus:border-primary focus:ring-primary/20"
-              />
+            <div className="flex gap-4 p-5 bg-secondary/30 rounded-xl border border-border/20">
+              <div className="flex-1">
+                <Label className="text-xs text-muted-foreground mb-2 block uppercase tracking-wide">Kullanım Yeri</Label>
+                <Input
+                  value={newUsageArea}
+                  onChange={(e) => setNewUsageArea(e.target.value)}
+                  placeholder="Yeni kullanım yeri..."
+                  className="h-12 bg-background/50 border-border/30 focus:border-primary focus:ring-primary/20"
+                  onKeyDown={(e) => e.key === "Enter" && handleAddUsageArea()}
+                />
+              </div>
             </div>
 
             <div className="flex gap-3 flex-wrap">
@@ -576,13 +645,13 @@ export function FabricManager({
                         <div className="space-y-2">
                           <Label className="text-sm font-medium">Excel'den kopyaladığınız kullanım yerlerini yapıştırın</Label>
                           <p className="text-xs text-muted-foreground">
-                            Her satır bir kullanım yeri olacak. 3+ yanyana A harfi içeren satırlar otomatik filtrelenir.
+                            Her satır bir kullanım yeri olacak. Tek "A" harfi ve özel filtreler içeren satırlar otomatik filtrelenir.
                           </p>
                         </div>
                         <Textarea
                           value={usageBulkPasteText}
                           onChange={(e) => setUsageBulkPasteText(e.target.value)}
-                          placeholder="Kullanım yerlerini buraya yapıştırın...&#10;BEDEN&#10;KOL&#10;YAKA&#10;MANŞET..."
+                          placeholder="Kullanım yerlerini buraya yapıştırın...&#10;BEDEN&#10;KOL&#10;YAKA..."
                           className="min-h-[200px] font-mono text-sm bg-background/50 border-border/30"
                         />
                         <Button 
@@ -598,7 +667,7 @@ export function FabricManager({
                       <>
                         <div className="flex items-center justify-between">
                           <Label className="text-sm font-medium">
-                            Kullanım Yerlerini Düzenleyin ({parsedUsageBulkItems.length} adet)
+                            Kullanım Yerlerini Kontrol Edin ({parsedUsageBulkItems.length} adet)
                           </Label>
                           <Button 
                             variant="ghost" 
@@ -613,34 +682,26 @@ export function FabricManager({
                         
                         <ScrollArea className="flex-1 max-h-[400px] rounded-lg border border-border/30 scrollbar-netflix">
                           <div className="p-4 space-y-2">
-                            {/* Header */}
-                            <div className="grid grid-cols-12 gap-2 px-3 py-2 bg-primary/10 rounded-lg text-xs font-semibold text-primary uppercase tracking-wide sticky top-0 z-10">
-                              <div className="col-span-10">Kullanım Yeri</div>
-                              <div className="col-span-2 text-center">İşlem</div>
-                            </div>
-
                             {parsedUsageBulkItems.map((item, index) => (
                               <div 
                                 key={index} 
-                                className="grid grid-cols-12 gap-2 items-center p-3 bg-secondary/30 rounded-lg border border-border/20 hover:border-primary/30 transition-all group"
+                                className="flex items-center gap-3 p-3 bg-secondary/30 rounded-lg border border-border/20 hover:border-primary/30 transition-all group"
                               >
-                                <div className="col-span-10">
+                                <div className="flex-1">
                                   <Input
                                     value={item}
                                     onChange={(e) => handleUpdateUsageBulkItem(index, e.target.value)}
                                     className="h-10 text-sm bg-background/50"
                                   />
                                 </div>
-                                <div className="col-span-2 flex justify-center">
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    onClick={() => handleRemoveUsageBulkItem(index)}
-                                    className="h-9 w-9 text-destructive hover:text-destructive hover:bg-destructive/10"
-                                  >
-                                    <Trash2 className="h-4 w-4" />
-                                  </Button>
-                                </div>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => handleRemoveUsageBulkItem(index)}
+                                  className="h-9 w-9 text-destructive hover:text-destructive hover:bg-destructive/10"
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
                               </div>
                             ))}
                           </div>
@@ -652,7 +713,7 @@ export function FabricManager({
                           disabled={parsedUsageBulkItems.length === 0}
                         >
                           <Check className="h-5 w-5 mr-2" />
-                          Tümünü Ekle ({parsedUsageBulkItems.filter(i => i.trim()).length} kullanım yeri)
+                          Tümünü Ekle ({parsedUsageBulkItems.filter(i => i.trim()).length} adet)
                         </Button>
                       </>
                     )}
@@ -668,36 +729,29 @@ export function FabricManager({
                 value={usageSearch}
                 onChange={(e) => setUsageSearch(e.target.value)}
                 placeholder="Kullanım yeri ara..."
-                className="pl-12 h-12 bg-secondary/30 border-border/30 focus:border-primary"
+                className="pl-12 h-12 bg-background/50 border-border/30 focus:border-primary"
               />
             </div>
 
-            {/* List */}
-            <ScrollArea className="h-[450px] rounded-xl border border-border/30 bg-background/50 scrollbar-netflix">
-              <div className="p-4 space-y-2">
-                {filteredUsageAreas.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
-                    <MapPin className="h-12 w-12 mb-4 opacity-30" />
-                    <p>{usageSearch ? "Sonuç bulunamadı" : "Henüz kullanım yeri eklenmemiş"}</p>
-                  </div>
-                ) : (
-                  filteredUsageAreas.map((area, index) => (
-                    <div
-                      key={index}
-                      className="flex items-center justify-between p-4 bg-secondary/30 rounded-lg border border-border/20 hover:border-primary/30 transition-all group"
+            {/* Usage Areas List */}
+            <ScrollArea className="h-[400px] rounded-xl border border-border/30 bg-gradient-to-br from-background/50 to-muted/20">
+              <div className="p-4 grid grid-cols-2 md:grid-cols-3 gap-2">
+                {filteredUsageAreas.map((area) => (
+                  <div 
+                    key={area} 
+                    className="group flex items-center justify-between p-3 rounded-lg border border-border/30 bg-card/50 hover:border-primary/30 hover:bg-card transition-all duration-200"
+                  >
+                    <span className="font-medium text-sm truncate">{area}</span>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => handleRemoveUsageArea(area)}
+                      className="h-7 w-7 opacity-0 group-hover:opacity-100 text-destructive hover:text-destructive hover:bg-destructive/10 transition-all"
                     >
-                      <span className="text-sm font-medium">{area}</span>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => handleRemoveUsageArea(area)}
-                        className="h-9 w-9 opacity-0 group-hover:opacity-100 text-destructive hover:text-destructive hover:bg-destructive/10 transition-all"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  ))
-                )}
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
+                ))}
               </div>
             </ScrollArea>
           </TabsContent>

@@ -14,7 +14,6 @@ import {
   DialogHeader,
   DialogTitle,
   DialogFooter,
-  DialogDescription,
 } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -294,26 +293,33 @@ export function LiveChat() {
     setIsSending(true);
 
     try {
-      const messageData: any = {
+      const messageData: Record<string, unknown> = {
         sender_id: user.id,
         content: newMessage.trim(),
       };
 
       if (selectedConversation.type === "group") {
         messageData.group_id = selectedConversation.id;
+        messageData.recipient_id = null;
       } else {
         messageData.recipient_id = selectedConversation.id;
+        messageData.group_id = null;
       }
 
       const { data, error } = await supabase
         .from("chat_messages")
-        .insert(messageData)
+        .insert([messageData as { sender_id: string; content: string; group_id?: string | null; recipient_id?: string | null }])
         .select()
         .single();
 
-      if (error) throw error;
+      if (error) {
+        console.error("Send message error:", error);
+        throw error;
+      }
 
-      setMessages([...messages, { ...data, sender_name: "Ben" }]);
+      if (data) {
+        setMessages(prev => [...prev, { ...data, sender_name: "Ben" }]);
+      }
       setNewMessage("");
       inputRef.current?.focus();
     } catch (error) {
@@ -370,19 +376,26 @@ export function LiveChat() {
         .select()
         .single();
 
-      if (groupError) throw groupError;
+      if (groupError) {
+        console.error("Group creation error:", groupError);
+        throw groupError;
+      }
 
-      // Add members (including creator)
-      const members = [...selectedMembers, user.id].map(userId => ({
-        group_id: group.id,
-        user_id: userId,
-      }));
-
-      const { error: membersError } = await supabase
-        .from("chat_group_members")
-        .insert(members);
-
-      if (membersError) throw membersError;
+      // Add members one by one (including creator)
+      const allMemberIds = [...selectedMembers, user.id];
+      
+      for (const memberId of allMemberIds) {
+        const { error: memberError } = await supabase
+          .from("chat_group_members")
+          .insert({
+            group_id: group.id,
+            user_id: memberId,
+          });
+        
+        if (memberError) {
+          console.error("Member insert error:", memberError);
+        }
+      }
 
       toast.success("Grup oluşturuldu");
       setIsCreateDialogOpen(false);
@@ -494,12 +507,12 @@ export function LiveChat() {
       <Sheet open={isOpen} onOpenChange={setIsOpen}>
         <SheetContent 
           side="right" 
-          className="w-full sm:w-[380px] p-0 flex flex-col bg-background/80 backdrop-blur-xl border-l border-border/50"
+          className="w-full sm:w-[380px] p-0 flex flex-col bg-background/70 backdrop-blur-2xl border-l border-border/30"
         >
           {selectedConversation ? (
             // Chat View
             <>
-              <div className="p-4 border-b bg-muted/30 flex items-center gap-3">
+              <div className="p-4 border-b bg-muted/20 flex items-center gap-3">
                 <Button
                   variant="ghost"
                   size="sm"
@@ -641,7 +654,7 @@ export function LiveChat() {
           ) : (
             // Conversations List
             <>
-              <div className="p-4 border-b bg-muted/30">
+              <div className="p-4 border-b bg-muted/20">
                 <h2 className="font-semibold flex items-center gap-2">
                   <MessageCircle className="h-5 w-5" />
                   Canlı Sohbet
@@ -698,7 +711,7 @@ export function LiveChat() {
                             <Avatar className="h-10 w-10">
                               <AvatarFallback>{u.full_name.charAt(0)}</AvatarFallback>
                             </Avatar>
-                            <div className="text-left">
+                            <div className="flex-1 text-left">
                               <p className="font-medium text-sm">{u.full_name}</p>
                               <p className="text-xs text-muted-foreground">@{u.username}</p>
                             </div>
@@ -708,11 +721,11 @@ export function LiveChat() {
                     )}
 
                     {/* Conversations */}
-                    {filteredConversations.length === 0 ? (
+                    {filteredConversations.length === 0 && !searchQuery ? (
                       <div className="text-center py-8 text-muted-foreground">
                         <Users className="h-12 w-12 mx-auto mb-3 opacity-30" />
-                        <p>Henüz sohbet yok</p>
-                        <p className="text-sm">Yeni Mesaj ile başlayın</p>
+                        <p className="text-sm">Henüz sohbet yok</p>
+                        <p className="text-xs">Yeni mesaj başlatın</p>
                       </div>
                     ) : (
                       filteredConversations.map((conv) => (
@@ -724,12 +737,12 @@ export function LiveChat() {
                           }}
                           className="w-full p-3 flex items-center gap-3 rounded-lg hover:bg-muted transition-colors"
                         >
-                          <Avatar className="h-11 w-11">
+                          <Avatar className="h-10 w-10">
                             <AvatarFallback className={conv.type === "group" ? "bg-primary text-primary-foreground" : ""}>
                               {conv.type === "group" ? (
                                 <Users className="h-5 w-5" />
                               ) : (
-                                conv.name.charAt(0).toUpperCase()
+                                conv.name.charAt(0)
                               )}
                             </AvatarFallback>
                           </Avatar>
@@ -749,7 +762,7 @@ export function LiveChat() {
                             )}
                           </div>
                           {conv.unreadCount > 0 && (
-                            <Badge variant="destructive" className="h-5 min-w-[20px] px-1.5">
+                            <Badge variant="destructive" className="h-5 min-w-[20px] px-1 text-xs">
                               {conv.unreadCount}
                             </Badge>
                           )}
@@ -766,95 +779,82 @@ export function LiveChat() {
 
       {/* Create Message/Group Dialog */}
       <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="max-w-md bg-background/95 backdrop-blur-xl">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <MessageCircle className="h-5 w-5" />
               Yeni Mesaj
             </DialogTitle>
-            <DialogDescription>
-              Bir kişi seçerek mesaj gönderin veya birden fazla kişi seçerek grup oluşturun.
-            </DialogDescription>
           </DialogHeader>
-
+          
           <div className="space-y-4">
-            {/* User Search */}
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
                 value={userSearchQuery}
                 onChange={(e) => setUserSearchQuery(e.target.value)}
-                placeholder="İsim veya kullanıcı adı ara..."
+                placeholder="Kullanıcı ara..."
                 className="pl-9"
               />
             </div>
 
-            {/* Group Name (shown if more than 1 selected) */}
             {selectedMembers.length > 1 && (
               <div>
-                <label className="text-sm font-medium mb-2 block">Grup Adı (opsiyonel)</label>
                 <Input
                   value={groupName}
                   onChange={(e) => setGroupName(e.target.value)}
-                  placeholder="Grup adı girin..."
+                  placeholder="Grup adı (opsiyonel)"
+                  className="mb-2"
                 />
+                <p className="text-xs text-muted-foreground">
+                  {selectedMembers.length} kişi seçildi - otomatik grup oluşturulacak
+                </p>
               </div>
             )}
 
-            <div>
-              <label className="text-sm font-medium mb-2 block">
-                Kişiler ({selectedMembers.length} seçildi)
-              </label>
-              <ScrollArea className="h-[250px] border rounded-lg p-2">
-                {filteredDialogUsers.map((u) => (
-                  <label
-                    key={u.user_id}
-                    className="flex items-center gap-3 p-2 rounded-lg hover:bg-muted cursor-pointer"
-                  >
-                    <Checkbox
-                      checked={selectedMembers.includes(u.user_id)}
-                      onCheckedChange={(checked) => {
-                        if (checked) {
-                          setSelectedMembers([...selectedMembers, u.user_id]);
-                        } else {
+            <ScrollArea className="h-[300px]">
+              <div className="space-y-1">
+                {filteredDialogUsers.map((u) => {
+                  const isSelected = selectedMembers.includes(u.user_id);
+                  return (
+                    <div
+                      key={u.user_id}
+                      onClick={() => {
+                        if (isSelected) {
                           setSelectedMembers(selectedMembers.filter(id => id !== u.user_id));
+                        } else {
+                          setSelectedMembers([...selectedMembers, u.user_id]);
                         }
                       }}
-                    />
-                    <Avatar className="h-8 w-8">
-                      <AvatarFallback>{u.full_name.charAt(0)}</AvatarFallback>
-                    </Avatar>
-                    <div>
-                      <p className="text-sm font-medium">{u.full_name}</p>
-                      <p className="text-xs text-muted-foreground">@{u.username}</p>
+                      className={cn(
+                        "p-3 flex items-center gap-3 rounded-lg cursor-pointer transition-colors",
+                        isSelected ? "bg-primary/10 border border-primary/30" : "hover:bg-muted"
+                      )}
+                    >
+                      <Checkbox checked={isSelected} />
+                      <Avatar className="h-9 w-9">
+                        <AvatarFallback>{u.full_name.charAt(0)}</AvatarFallback>
+                      </Avatar>
+                      <div className="flex-1">
+                        <p className="font-medium text-sm">{u.full_name}</p>
+                        <p className="text-xs text-muted-foreground">@{u.username}</p>
+                      </div>
                     </div>
-                  </label>
-                ))}
-              </ScrollArea>
-            </div>
+                  );
+                })}
+              </div>
+            </ScrollArea>
           </div>
 
           <DialogFooter>
-            <Button variant="outline" onClick={() => {
-              setIsCreateDialogOpen(false);
-              setSelectedMembers([]);
-              setGroupName("");
-              setUserSearchQuery("");
-            }}>
+            <Button variant="outline" onClick={() => setIsCreateDialogOpen(false)}>
               İptal
             </Button>
-            <Button onClick={handleCreateMessageOrGroup} disabled={selectedMembers.length === 0}>
-              {selectedMembers.length > 1 ? (
-                <>
-                  <Users className="h-4 w-4 mr-1" />
-                  Grup Oluştur
-                </>
-              ) : (
-                <>
-                  <MessageCircle className="h-4 w-4 mr-1" />
-                  Mesaj Gönder
-                </>
-              )}
+            <Button 
+              onClick={handleCreateMessageOrGroup}
+              disabled={selectedMembers.length === 0}
+            >
+              {selectedMembers.length > 1 ? "Grup Oluştur" : "Mesaj Başlat"}
             </Button>
           </DialogFooter>
         </DialogContent>
