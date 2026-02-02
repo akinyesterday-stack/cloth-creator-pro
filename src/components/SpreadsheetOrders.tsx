@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { 
   Plus, Trash2, Save, Download, FileSpreadsheet, 
-  ArrowUpDown, Loader2, Zap
+  ArrowUpDown, Loader2, Zap, Clock
 } from "lucide-react";
 import {
   Table,
@@ -22,6 +22,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -50,10 +57,10 @@ interface OrderRow {
 }
 
 const statusOptions = [
-  { value: "pending", label: "Beklemede", color: "bg-yellow-500/20 text-yellow-700" },
-  { value: "processing", label: "İşleniyor", color: "bg-blue-500/20 text-blue-700" },
-  { value: "completed", label: "Tamamlandı", color: "bg-green-500/20 text-green-700" },
-  { value: "cancelled", label: "İptal", color: "bg-red-500/20 text-destructive" },
+  { value: "pending", label: "Beklemede", color: "bg-yellow-500/20 text-yellow-700 dark:text-yellow-400" },
+  { value: "processing", label: "İşleniyor", color: "bg-blue-500/20 text-blue-700 dark:text-blue-400" },
+  { value: "completed", label: "Tamamlandı", color: "bg-green-500/20 text-green-700 dark:text-green-400" },
+  { value: "cancelled", label: "İptal", color: "bg-red-500/20 text-red-700 dark:text-red-400" },
 ];
 
 export function SpreadsheetOrders() {
@@ -62,6 +69,8 @@ export function SpreadsheetOrders() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
+  const [excelNameDialogOpen, setExcelNameDialogOpen] = useState(false);
+  const [excelFileName, setExcelFileName] = useState("");
 
   useEffect(() => {
     if (user) {
@@ -231,11 +240,17 @@ export function SpreadsheetOrders() {
     }
   };
 
-  const exportToExcel = async () => {
+  const handleExcelClick = () => {
     if (rows.length === 0) {
       toast.error("İndirilecek sipariş bulunamadı");
       return;
     }
+    setExcelFileName(`siparisler_${new Date().toISOString().split("T")[0]}`);
+    setExcelNameDialogOpen(true);
+  };
+
+  const exportToExcel = async () => {
+    setExcelNameDialogOpen(false);
 
     const workbook = new ExcelJS.Workbook();
     workbook.creator = "Kumaş Tedarik Sistemi";
@@ -324,9 +339,10 @@ export function SpreadsheetOrders() {
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.download = `siparisler_${new Date().toISOString().split("T")[0]}.xlsx`;
+    link.download = `${excelFileName || 'siparisler'}.xlsx`;
     link.click();
     URL.revokeObjectURL(url);
+    setExcelFileName("");
 
     toast.success("Excel dosyası indirildi");
   };
@@ -368,7 +384,7 @@ export function SpreadsheetOrders() {
             <Button
               variant="outline"
               size="sm"
-              onClick={exportToExcel}
+              onClick={handleExcelClick}
               className="gap-1"
             >
               <Download className="h-4 w-4" />
@@ -573,6 +589,38 @@ export function SpreadsheetOrders() {
           </TableBody>
         </Table>
       </CardContent>
+
+      {/* Excel Name Dialog */}
+      <Dialog open={excelNameDialogOpen} onOpenChange={setExcelNameDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <FileSpreadsheet className="h-5 w-5 text-primary" />
+              Excel Dosya Adı
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <Input
+              value={excelFileName}
+              onChange={(e) => setExcelFileName(e.target.value)}
+              placeholder="Dosya adı..."
+              className="h-11"
+            />
+            <p className="text-sm text-muted-foreground">
+              Dosya .xlsx uzantısıyla kaydedilecektir.
+            </p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setExcelNameDialogOpen(false)}>
+              İptal
+            </Button>
+            <Button onClick={exportToExcel} disabled={!excelFileName.trim()}>
+              <Download className="h-4 w-4 mr-2" />
+              İndir
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 }
