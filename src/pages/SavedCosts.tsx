@@ -5,11 +5,11 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Search, Trash2, Calendar, Package, ArrowLeft, Loader2, Download, FileSpreadsheet, Pencil, Check, X, Upload, Image, ArrowUpDown, Plus, SendHorizontal } from "lucide-react";
+import { Search, Trash2, Calendar, Package, ArrowLeft, Loader2, Download, FileSpreadsheet, Pencil, Check, X, Upload, Image, ArrowUpDown, Plus, SendHorizontal, Copy, FileImage } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { format } from "date-fns";
 import { tr } from "date-fns/locale";
 import ExcelJS from "exceljs";
@@ -31,6 +31,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { ImageGenerator } from "@/components/ImageGenerator";
 
 interface FabricItem {
   id: string;
@@ -39,6 +40,7 @@ interface FabricItem {
   en: number;
   gramaj: number;
   fiyat: number;
+  priceExpected?: boolean;
 }
 
 interface SavedCost {
@@ -54,6 +56,7 @@ interface SavedCost {
 const SavedCosts = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [costs, setCosts] = useState<SavedCost[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
@@ -69,6 +72,10 @@ const SavedCosts = () => {
   // Edit items dialog
   const [editingItemsCostId, setEditingItemsCostId] = useState<string | null>(null);
   const [editingItems, setEditingItems] = useState<FabricItem[]>([]);
+
+  // Image generator
+  const [imageGenOpen, setImageGenOpen] = useState(false);
+  const [imageGenImages, setImageGenImages] = useState<Array<{ src: string; label: string }>>([]);
 
   useEffect(() => {
     if (user) {
@@ -323,6 +330,42 @@ const SavedCosts = () => {
       console.error("Error transferring to orders:", error);
       toast.error("Siparişe aktarma başarısız");
     }
+  };
+
+  // Send items to new cost calculation
+  const handleSendToNewCost = (cost: SavedCost) => {
+    // Navigate to main page with items in URL state
+    const itemsData = encodeURIComponent(JSON.stringify({
+      modelName: cost.model_name,
+      items: cost.items,
+      images: cost.images,
+    }));
+    navigate(`/?importCost=${itemsData}`);
+    toast.success(`"${cost.model_name}" maliyete aktarılıyor...`);
+  };
+
+  // Open image generator with selected costs
+  const handleOpenImageGenerator = () => {
+    const selected = costs.filter(c => selectedIds.has(c.id));
+    if (selected.length === 0) {
+      toast.error("Lütfen en az bir model seçin");
+      return;
+    }
+    
+    const images = selected.flatMap(cost => 
+      (cost.images || []).map(img => ({
+        src: img,
+        label: cost.model_name,
+      }))
+    );
+    
+    if (images.length === 0) {
+      toast.error("Seçili modellerde resim bulunamadı");
+      return;
+    }
+    
+    setImageGenImages(images);
+    setImageGenOpen(true);
   };
 
   const handleSelectToggle = (id: string) => {
@@ -624,13 +667,23 @@ const SavedCosts = () => {
               </Button>
               
               {selectedIds.size > 0 && (
-                <Button 
-                  onClick={handleDownloadSelected}
-                  className="gap-2"
-                >
-                  <FileSpreadsheet className="h-4 w-4" />
-                  Seçilenleri İndir ({selectedIds.size})
-                </Button>
+                <>
+                  <Button 
+                    variant="outline"
+                    onClick={handleOpenImageGenerator}
+                    className="gap-2"
+                  >
+                    <FileImage className="h-4 w-4" />
+                    Resim Oluştur ({selectedIds.size})
+                  </Button>
+                  <Button 
+                    onClick={handleDownloadSelected}
+                    className="gap-2"
+                  >
+                    <FileSpreadsheet className="h-4 w-4" />
+                    Seçilenleri İndir ({selectedIds.size})
+                  </Button>
+                </>
               )}
             </div>
           </div>
@@ -823,8 +876,22 @@ const SavedCosts = () => {
                             <Button 
                               variant="outline" 
                               size="icon"
+                              onClick={() => handleSendToNewCost(cost)}
+                              className="text-blue-600 hover:text-blue-700 hover:bg-blue-50 dark:hover:bg-blue-950"
+                            >
+                              <Copy className="h-4 w-4" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>Yeni Maliyete Kopyala</TooltipContent>
+                        </Tooltip>
+                        
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button 
+                              variant="outline" 
+                              size="icon"
                               onClick={() => handleTransferToOrders(cost)}
-                              className="text-green-600 hover:text-green-700 hover:bg-green-50"
+                              className="text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-950"
                             >
                               <SendHorizontal className="h-4 w-4" />
                             </Button>
@@ -962,6 +1029,14 @@ const SavedCosts = () => {
             </div>
           </DialogContent>
         </Dialog>
+
+        {/* Image Generator */}
+        <ImageGenerator 
+          open={imageGenOpen} 
+          onOpenChange={setImageGenOpen}
+          images={imageGenImages}
+          title="TAHA GİYİM - Kayıtlı Maliyetler"
+        />
       </main>
       
       <footer className="border-t border-border/50 py-6 mt-12 bg-card/50 backdrop-blur-sm relative z-10">
