@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { 
   Plus, Trash2, Save, Download, FileSpreadsheet, 
-  ArrowUpDown, Loader2, Zap, Clock
+  ArrowUpDown, Loader2, Zap, Clock, FileImage
 } from "lucide-react";
 import {
   Table,
@@ -35,6 +35,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
 import ExcelJS from "exceljs";
 import { format } from "date-fns";
+import { ImageGenerator } from "@/components/ImageGenerator";
 
 interface OrderRow {
   id: string;
@@ -71,6 +72,9 @@ export function SpreadsheetOrders() {
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
   const [excelNameDialogOpen, setExcelNameDialogOpen] = useState(false);
   const [excelFileName, setExcelFileName] = useState("");
+  const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set());
+  const [imageGenOpen, setImageGenOpen] = useState(false);
+  const [imageGenImages, setImageGenImages] = useState<Array<{ src: string; label: string }>>([]);
 
   useEffect(() => {
     if (user) {
@@ -353,6 +357,47 @@ export function SpreadsheetOrders() {
     return statusOptions.find(s => s.value === status)?.color || "";
   };
 
+  const handleSelectRow = (id: string) => {
+    setSelectedRows(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  };
+
+  const handleSelectAll = () => {
+    if (selectedRows.size === rows.length) {
+      setSelectedRows(new Set());
+    } else {
+      setSelectedRows(new Set(rows.map(r => r.id)));
+    }
+  };
+
+  const handleOpenImageGenerator = () => {
+    const selected = selectedRows.size > 0 
+      ? rows.filter(r => selectedRows.has(r.id))
+      : rows;
+    
+    const images = selected
+      .filter(r => r.model_image)
+      .map(r => ({
+        src: r.model_image!,
+        label: r.order_name,
+      }));
+    
+    if (images.length === 0) {
+      toast.error("Resim bulunamadı");
+      return;
+    }
+    
+    setImageGenImages(images);
+    setImageGenOpen(true);
+  };
+
   if (isLoading) {
     return (
       <Card className="glass-card">
@@ -384,6 +429,15 @@ export function SpreadsheetOrders() {
             <Button
               variant="outline"
               size="sm"
+              onClick={handleOpenImageGenerator}
+              className="gap-1"
+            >
+              <FileImage className="h-4 w-4" />
+              Resim Oluştur {selectedRows.size > 0 ? `(${selectedRows.size})` : ""}
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
               onClick={handleExcelClick}
               className="gap-1"
             >
@@ -403,7 +457,7 @@ export function SpreadsheetOrders() {
                 size="sm"
                 onClick={handleSaveAll}
                 disabled={isSaving}
-                className="gap-1 bg-green-600 hover:bg-green-700"
+                className="gap-1 bg-emerald-600 hover:bg-emerald-700"
               >
                 {isSaving ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
@@ -420,6 +474,12 @@ export function SpreadsheetOrders() {
         <Table>
           <TableHeader>
             <TableRow className="bg-muted/50">
+              <TableHead className="w-[40px] text-center">
+                <Checkbox
+                  checked={selectedRows.size === rows.length && rows.length > 0}
+                  onCheckedChange={handleSelectAll}
+                />
+              </TableHead>
               <TableHead className="w-[40px]"></TableHead>
               <TableHead className="w-[50px] text-center">FT</TableHead>
               <TableHead className="min-w-[130px]">Model Adı</TableHead>
@@ -439,7 +499,7 @@ export function SpreadsheetOrders() {
           <TableBody>
             {rows.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={14} className="text-center py-8 text-muted-foreground">
+                <TableCell colSpan={15} className="text-center py-8 text-muted-foreground">
                   Henüz sipariş bulunmuyor. "Yeni Satır" butonuna tıklayın.
                 </TableCell>
               </TableRow>
@@ -448,14 +508,21 @@ export function SpreadsheetOrders() {
                 <TableRow 
                   key={row.id} 
                   className={`
-                    ${row.isNew ? "bg-green-50 dark:bg-green-950/20" : ""}
-                    ${row.isModified && !row.isNew ? "bg-yellow-50 dark:bg-yellow-950/20" : ""}
+                    ${row.isNew ? "bg-emerald-50 dark:bg-emerald-950/20" : ""}
+                    ${row.isModified && !row.isNew ? "bg-amber-50/50 dark:bg-amber-950/20" : ""}
                     ${row.is_fast_track ? "bg-amber-50 dark:bg-amber-950/20" : ""}
+                    ${selectedRows.has(row.id) ? "bg-primary/5" : ""}
                   `}
                 >
+                  <TableCell className="px-2 text-center">
+                    <Checkbox
+                      checked={selectedRows.has(row.id)}
+                      onCheckedChange={() => handleSelectRow(row.id)}
+                    />
+                  </TableCell>
                   <TableCell className="px-2">
                     {(row.isNew || row.isModified) && (
-                      <div className={`w-2 h-2 rounded-full ${row.isNew ? "bg-green-500" : "bg-yellow-500"}`} />
+                      <div className={`w-2 h-2 rounded-full ${row.isNew ? "bg-emerald-500" : "bg-amber-500"}`} />
                     )}
                   </TableCell>
                   <TableCell className="text-center">
@@ -621,6 +688,14 @@ export function SpreadsheetOrders() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Image Generator */}
+      <ImageGenerator 
+        open={imageGenOpen} 
+        onOpenChange={setImageGenOpen}
+        images={imageGenImages}
+        title="TAHA GİYİM - Siparişler"
+      />
     </Card>
   );
 }
