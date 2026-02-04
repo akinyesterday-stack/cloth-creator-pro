@@ -57,6 +57,8 @@ interface OrderWithTermin {
   status: string;
   fabric_type: string | null;
   is_fast_track: boolean;
+  user_id?: string;
+  user_name?: string;
 }
 
 interface UserProfile {
@@ -205,15 +207,30 @@ export function Dashboard() {
       // Load ALL FT orders (from all users) - these are important
       const { data: allFtData, error: ftError } = await supabase
         .from("orders")
-        .select("id, order_name, termin_date, po_termin_date, fabric_termin_date, status, fabric_type, is_fast_track")
+        .select("id, order_name, termin_date, po_termin_date, fabric_termin_date, status, fabric_type, is_fast_track, user_id")
         .eq("is_fast_track", true)
         .neq("status", "completed")
         .neq("status", "cancelled")
         .order("po_termin_date", { ascending: true, nullsFirst: false })
-        .limit(20);
+        .limit(50);
         
-      if (!ftError) {
-        setFtOrders(allFtData || []);
+      if (!ftError && allFtData) {
+        // Get user names for FT orders
+        const userIds = [...new Set(allFtData.map(o => o.user_id))];
+        const { data: profiles } = await supabase
+          .from("profiles")
+          .select("user_id, full_name")
+          .in("user_id", userIds);
+          
+        const profileMap = new Map(profiles?.map(p => [p.user_id, p.full_name]) || []);
+        
+        const ftWithNames = allFtData.map(o => ({
+          ...o,
+          is_fast_track: true,
+          user_name: profileMap.get(o.user_id) || "Bilinmeyen"
+        }));
+        
+        setFtOrders(ftWithNames);
       }
     } catch (error) {
       console.error("Error loading orders:", error);
@@ -530,6 +547,11 @@ export function Dashboard() {
                       <div className="flex items-center gap-2">
                         <Zap className="h-4 w-4 text-amber-500" />
                         <p className="font-medium text-sm truncate">{order.order_name}</p>
+                        {order.user_name && (
+                          <Badge variant="outline" className="text-[10px] py-0 px-1.5">
+                            {order.user_name.split(' ')[0]}
+                          </Badge>
+                        )}
                       </div>
                       {order.fabric_type && <p className="text-xs text-muted-foreground truncate">{order.fabric_type}</p>}
                       {order.po_termin_date && (
