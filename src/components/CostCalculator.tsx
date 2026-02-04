@@ -12,6 +12,13 @@ import { RadioPlayer } from "@/components/RadioPlayer";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import ExcelJS from "exceljs";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -32,7 +39,17 @@ interface FabricItem {
   gramaj: number;
   fiyat: number;
   priceExpected?: boolean; // Üreticiden fiyat bekleniyor
+  printType?: string; // baskılı tipi: fon, zemin, boyalı, pigment, aşındırma
 }
+
+// Print type options for "Baskılı" fabrics
+const PRINT_TYPE_OPTIONS = [
+  { value: "fon", label: "Fon", color: "FFE4C4" },
+  { value: "zemin", label: "Zemin", color: "D4E4BC" },
+  { value: "boyalı", label: "Boyalı", color: "E4D4F4" },
+  { value: "pigment", label: "Pigment", color: "F4D4E4" },
+  { value: "aşındırma", label: "Aşındırma", color: "D4E4F4" },
+];
 
 interface ModelGroup {
   id: string;
@@ -96,6 +113,9 @@ export const CostCalculator = forwardRef<HTMLDivElement, CostCalculatorProps>(fu
   // Price expected state
   const [priceExpected, setPriceExpected] = useState(false);
   
+  // Print type state (for baskılı fabrics)
+  const [selectedPrintType, setSelectedPrintType] = useState("");
+  
   // Recent items tracking
   const [recentFabrics, setRecentFabrics] = useState<string[]>([]);
   const [recentUsageAreas, setRecentUsageAreas] = useState<string[]>([]);
@@ -103,6 +123,11 @@ export const CostCalculator = forwardRef<HTMLDivElement, CostCalculatorProps>(fu
   // Excel export dialog
   const [excelNameDialogOpen, setExcelNameDialogOpen] = useState(false);
   const [excelFileName, setExcelFileName] = useState("");
+  
+  // Check if fabric is "baskılı" type
+  const isBaskili = selectedFabric.toLowerCase().includes("baskılı") || 
+                   selectedFabric.toLowerCase().includes("baski") ||
+                   selectedFabric.toLowerCase().includes("metraj baskı");
 
   // Load user's fabric types, usage areas and prices from database
   useEffect(() => {
@@ -307,6 +332,7 @@ export const CostCalculator = forwardRef<HTMLDivElement, CostCalculatorProps>(fu
       gramaj,
       fiyat: priceExpected ? 0 : fiyat,
       priceExpected,
+      printType: isBaskili ? selectedPrintType : undefined,
     };
 
     setModels(models.map(model => 
@@ -347,6 +373,7 @@ export const CostCalculator = forwardRef<HTMLDivElement, CostCalculatorProps>(fu
     setGramaj(0);
     setFiyat(0);
     setPriceExpected(false);
+    setSelectedPrintType("");
   };
 
   // Toggle item selection
@@ -661,15 +688,20 @@ export const CostCalculator = forwardRef<HTMLDivElement, CostCalculatorProps>(fu
         const row = worksheet.addRow({
           resim: '',
           modelAdi: i === 0 ? model.modelName : '',
-          kumasTuru: item.fabricType,
+          kumasTuru: item.fabricType + (item.printType ? ` (${item.printType.toUpperCase()})` : ''),
           kullanimYeri: item.usageArea,
           en: item.en,
           gramaj: item.gramaj,
-          fiyat: item.fiyat,
+          fiyat: item.priceExpected ? 'FİYAT BEKLENİYOR' : item.fiyat,
           birimGramaj: '', // Empty for manual entry
         });
 
         row.height = 60;
+
+        // Get print type color for baskılı items
+        const printTypeColor = item.printType 
+          ? PRINT_TYPE_OPTIONS.find(p => p.value === item.printType)?.color 
+          : null;
 
         // Style all cells
         row.eachCell((cell, colNumber) => {
@@ -683,6 +715,15 @@ export const CostCalculator = forwardRef<HTMLDivElement, CostCalculatorProps>(fu
               fgColor: { argb: 'DBEAFE' }
             };
             cell.font = { bold: true, size: 11 };
+          }
+          
+          // Apply print type color to fabric type column
+          if (colNumber === 3 && printTypeColor) {
+            cell.fill = {
+              type: 'pattern',
+              pattern: 'solid',
+              fgColor: { argb: printTypeColor }
+            };
           }
           
           // All cells get borders
@@ -1194,6 +1235,31 @@ export const CostCalculator = forwardRef<HTMLDivElement, CostCalculatorProps>(fu
                   disabled={priceExpected}
                 />
               </div>
+
+              {/* Print Type Selection - only show for baskılı fabrics */}
+              {isBaskili && (
+                <div className="space-y-3">
+                  <Label className="text-sm font-semibold text-foreground/80">Baskı Tipi</Label>
+                  <Select value={selectedPrintType} onValueChange={setSelectedPrintType}>
+                    <SelectTrigger className="h-11">
+                      <SelectValue placeholder="Baskı tipi seçin..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {PRINT_TYPE_OPTIONS.map(opt => (
+                        <SelectItem key={opt.value} value={opt.value}>
+                          <div className="flex items-center gap-2">
+                            <div 
+                              className="w-3 h-3 rounded-full" 
+                              style={{ backgroundColor: `#${opt.color}` }}
+                            />
+                            {opt.label}
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
 
               <div className="flex items-end">
                 <Button

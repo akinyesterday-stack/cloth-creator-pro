@@ -41,6 +41,7 @@ interface FabricItem {
   gramaj: number;
   fiyat: number;
   priceExpected?: boolean;
+  printType?: string; // baskılı tipi: fon, zemin, boyalı, pigment, aşındırma
 }
 
 interface SavedCost {
@@ -76,6 +77,12 @@ const SavedCosts = () => {
   // Image generator
   const [imageGenOpen, setImageGenOpen] = useState(false);
   const [imageGenImages, setImageGenImages] = useState<Array<{ src: string; label: string }>>([]);
+
+  // Row selection for import
+  const [selectedRowsForImport, setSelectedRowsForImport] = useState<Set<string>>(new Set());
+  const [importDialogOpen, setImportDialogOpen] = useState(false);
+  const [importModelName, setImportModelName] = useState("");
+  const [importSourceCost, setImportSourceCost] = useState<SavedCost | null>(null);
 
   useEffect(() => {
     if (user) {
@@ -344,6 +351,60 @@ const SavedCosts = () => {
     toast.success(`"${cost.model_name}" maliyete aktarılıyor...`);
   };
 
+  // Open row selection dialog for a specific cost
+  const handleOpenRowImportDialog = (cost: SavedCost) => {
+    setImportSourceCost(cost);
+    setSelectedRowsForImport(new Set());
+    setImportModelName("");
+    setImportDialogOpen(true);
+  };
+
+  // Toggle row selection for import
+  const handleToggleRowForImport = (itemId: string) => {
+    setSelectedRowsForImport(prev => {
+      const next = new Set(prev);
+      if (next.has(itemId)) {
+        next.delete(itemId);
+      } else {
+        next.add(itemId);
+      }
+      return next;
+    });
+  };
+
+  // Select all rows for import
+  const handleSelectAllRowsForImport = () => {
+    if (!importSourceCost) return;
+    if (selectedRowsForImport.size === importSourceCost.items.length) {
+      setSelectedRowsForImport(new Set());
+    } else {
+      setSelectedRowsForImport(new Set(importSourceCost.items.map(i => i.id)));
+    }
+  };
+
+  // Confirm and send selected rows to new cost
+  const handleConfirmRowImport = () => {
+    if (!importSourceCost || selectedRowsForImport.size === 0 || !importModelName.trim()) {
+      toast.error("Model adı giriniz ve en az bir satır seçiniz");
+      return;
+    }
+
+    const selectedItems = importSourceCost.items.filter(item => selectedRowsForImport.has(item.id));
+    const itemsData = encodeURIComponent(JSON.stringify({
+      modelName: importModelName.trim(),
+      items: selectedItems,
+      images: importSourceCost.images,
+    }));
+    
+    navigate(`/?importCost=${itemsData}`);
+    toast.success(`${selectedItems.length} satır "${importModelName}" modeline aktarılıyor...`);
+    
+    setImportDialogOpen(false);
+    setImportSourceCost(null);
+    setSelectedRowsForImport(new Set());
+    setImportModelName("");
+  };
+
   // Open image generator with selected costs
   const handleOpenImageGenerator = () => {
     const selected = costs.filter(c => selectedIds.has(c.id));
@@ -386,6 +447,15 @@ const SavedCosts = () => {
     } else {
       setSelectedIds(new Set(filteredCosts.map(c => c.id)));
     }
+  };
+
+  // Print type colors for Excel
+  const PRINT_TYPE_COLORS: Record<string, string> = {
+    "fon": "FFE4C4",
+    "zemin": "D4E4BC",
+    "boyalı": "E4D4F4",
+    "pigment": "F4D4E4",
+    "aşındırma": "D4E4F4",
   };
 
   // Excel export function for given costs
@@ -445,15 +515,18 @@ const SavedCosts = () => {
         const row = worksheet.addRow({
           resim: '',
           modelAdi: i === 0 ? cost.model_name : '',
-          kumasTuru: item.fabricType,
+          kumasTuru: item.fabricType + (item.printType ? ` (${item.printType.toUpperCase()})` : ''),
           kullanimYeri: item.usageArea,
           en: item.en,
           gramaj: item.gramaj,
-          fiyat: item.fiyat,
+          fiyat: item.priceExpected ? 'FİYAT BEKLENİYOR' : item.fiyat,
           birimGramaj: '',
         });
 
         row.height = 60;
+
+        // Get print type color for baskılı items
+        const printTypeColor = item.printType ? PRINT_TYPE_COLORS[item.printType] : null;
 
         row.eachCell((cell, colNumber) => {
           cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
@@ -465,6 +538,15 @@ const SavedCosts = () => {
               fgColor: { argb: 'DBEAFE' }
             };
             cell.font = { bold: true, size: 11 };
+          }
+          
+          // Apply print type color to fabric type column
+          if (colNumber === 3 && printTypeColor) {
+            cell.fill = {
+              type: 'pattern',
+              pattern: 'solid',
+              fgColor: { argb: printTypeColor }
+            };
           }
           
           cell.border = {
@@ -876,13 +958,27 @@ const SavedCosts = () => {
                             <Button 
                               variant="outline" 
                               size="icon"
+                              onClick={() => handleOpenRowImportDialog(cost)}
+                              className="text-violet-600 hover:text-violet-700 hover:bg-violet-50 dark:hover:bg-violet-950"
+                            >
+                              <ArrowUpDown className="h-4 w-4" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>Satır Seçerek Kopyala</TooltipContent>
+                        </Tooltip>
+                        
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button 
+                              variant="outline" 
+                              size="icon"
                               onClick={() => handleSendToNewCost(cost)}
                               className="text-blue-600 hover:text-blue-700 hover:bg-blue-50 dark:hover:bg-blue-950"
                             >
                               <Copy className="h-4 w-4" />
                             </Button>
                           </TooltipTrigger>
-                          <TooltipContent>Yeni Maliyete Kopyala</TooltipContent>
+                          <TooltipContent>Tümünü Yeni Maliyete Kopyala</TooltipContent>
                         </Tooltip>
                         
                         <Tooltip>
@@ -1027,6 +1123,72 @@ const SavedCosts = () => {
                 </Button>
               </div>
             </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Row Import Dialog */}
+        <Dialog open={importDialogOpen} onOpenChange={setImportDialogOpen}>
+          <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Satır Seçerek Yeni Maliyete Kopyala</DialogTitle>
+            </DialogHeader>
+            {importSourceCost && (
+              <div className="space-y-4 mt-4">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Yeni Model Adı</label>
+                  <Input
+                    value={importModelName}
+                    onChange={(e) => setImportModelName(e.target.value)}
+                    placeholder="Model adı giriniz..."
+                    className="h-10"
+                  />
+                </div>
+                
+                <div className="flex items-center gap-2 border-b pb-2">
+                  <Checkbox
+                    checked={selectedRowsForImport.size === importSourceCost.items.length && importSourceCost.items.length > 0}
+                    onCheckedChange={handleSelectAllRowsForImport}
+                  />
+                  <span className="text-sm font-medium">Tümünü Seç ({importSourceCost.items.length} satır)</span>
+                </div>
+                
+                <div className="space-y-2">
+                  {importSourceCost.items.map((item, idx) => (
+                    <div 
+                      key={item.id || idx} 
+                      className={`flex items-center gap-3 p-3 border rounded-lg cursor-pointer transition-colors ${
+                        selectedRowsForImport.has(item.id) ? 'bg-primary/10 border-primary/50' : 'hover:bg-muted/50'
+                      }`}
+                      onClick={() => handleToggleRowForImport(item.id)}
+                    >
+                      <Checkbox
+                        checked={selectedRowsForImport.has(item.id)}
+                        onCheckedChange={() => handleToggleRowForImport(item.id)}
+                      />
+                      <div className="flex-1 grid grid-cols-2 md:grid-cols-4 gap-2 text-sm">
+                        <span className="font-medium">{item.fabricType}</span>
+                        <span className="text-muted-foreground">{item.usageArea}</span>
+                        <span className="text-muted-foreground">{item.en}cm / {item.gramaj}gr</span>
+                        <span className="font-medium text-right">₺{item.fiyat.toFixed(2)}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                
+                <div className="flex justify-end gap-2 pt-4 border-t">
+                  <Button variant="outline" onClick={() => setImportDialogOpen(false)}>
+                    İptal
+                  </Button>
+                  <Button 
+                    onClick={handleConfirmRowImport}
+                    disabled={selectedRowsForImport.size === 0 || !importModelName.trim()}
+                  >
+                    <Copy className="h-4 w-4 mr-2" />
+                    {selectedRowsForImport.size} Satır Kopyala
+                  </Button>
+                </div>
+              </div>
+            )}
           </DialogContent>
         </Dialog>
 
