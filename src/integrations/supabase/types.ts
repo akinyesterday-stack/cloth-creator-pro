@@ -14,6 +14,232 @@ export type Database = {
   }
   public: {
     Tables: {
+      buyer_order_countries: {
+        Row: {
+          ana_beden: number | null
+          color: string | null
+          country: string
+          created_at: string
+          id: string
+          order_id: string | null
+          rota: string | null
+          size_0m_1m: number | null
+          size_1m_3m: number | null
+          size_3m_6m: number | null
+          size_6m_9m: number | null
+          total_quantity: number | null
+        }
+        Insert: {
+          ana_beden?: number | null
+          color?: string | null
+          country: string
+          created_at?: string
+          id?: string
+          order_id?: string | null
+          rota?: string | null
+          size_0m_1m?: number | null
+          size_1m_3m?: number | null
+          size_3m_6m?: number | null
+          size_6m_9m?: number | null
+          total_quantity?: number | null
+        }
+        Update: {
+          ana_beden?: number | null
+          color?: string | null
+          country?: string
+          created_at?: string
+          id?: string
+          order_id?: string | null
+          rota?: string | null
+          size_0m_1m?: number | null
+          size_1m_3m?: number | null
+          size_3m_6m?: number | null
+          size_6m_9m?: number | null
+          total_quantity?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "buyer_order_countries_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "buyer_orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      buyer_order_items: {
+        Row: {
+          asorti_0m_1m: number | null
+          asorti_1m_3m: number | null
+          asorti_3m_6m: number | null
+          asorti_6m_9m: number | null
+          asorti_count: number | null
+          asorti_per_set: number | null
+          created_at: string
+          id: string
+          inspection_date: string | null
+          jit: boolean | null
+          model: string | null
+          option_name: string | null
+          order_id: string | null
+          satis_bolgesi: string | null
+          size_0m_1m: number | null
+          size_1m_3m: number | null
+          size_3m_6m: number | null
+          size_6m_9m: number | null
+          total_quantity: number | null
+        }
+        Insert: {
+          asorti_0m_1m?: number | null
+          asorti_1m_3m?: number | null
+          asorti_3m_6m?: number | null
+          asorti_6m_9m?: number | null
+          asorti_count?: number | null
+          asorti_per_set?: number | null
+          created_at?: string
+          id?: string
+          inspection_date?: string | null
+          jit?: boolean | null
+          model?: string | null
+          option_name?: string | null
+          order_id?: string | null
+          satis_bolgesi?: string | null
+          size_0m_1m?: number | null
+          size_1m_3m?: number | null
+          size_3m_6m?: number | null
+          size_6m_9m?: number | null
+          total_quantity?: number | null
+        }
+        Update: {
+          asorti_0m_1m?: number | null
+          asorti_1m_3m?: number | null
+          asorti_3m_6m?: number | null
+          asorti_6m_9m?: number | null
+          asorti_count?: number | null
+          asorti_per_set?: number | null
+          created_at?: string
+          id?: string
+          inspection_date?: string | null
+          jit?: boolean | null
+          model?: string | null
+          option_name?: string | null
+          order_id?: string | null
+          satis_bolgesi?: string | null
+          size_0m_1m?: number | null
+          size_1m_3m?: number | null
+          size_3m_6m?: number | null
+          size_6m_9m?: number | null
+          total_quantity?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "buyer_order_items_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "buyer_orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      buyer_orders: {
+        Row: {
+          assigned_to: string | null
+          brand: string | null
+          created_at: string
+          customer_name: string
+          fabric_price: number | null
+          id: string
+          kdv_amount: number | null
+          kdv_rate: number | null
+          kumesci: string | null
+          mal_tanimi: string | null
+          merch_alt_grup: string | null
+          model_image: string | null
+          model_name: string
+          option_price: string | null
+          order_code: string | null
+          order_date: string
+          po_number: string
+          profit_amount: number | null
+          profit_margin: number | null
+          season: string | null
+          status: string | null
+          teslim_yeri: string | null
+          total_amount: number | null
+          total_quantity: number
+          total_with_kdv: number | null
+          unit_price: number | null
+          updated_at: string
+          user_id: string
+          yd_inspection_date: string | null
+          yi_inspection_date: string | null
+        }
+        Insert: {
+          assigned_to?: string | null
+          brand?: string | null
+          created_at?: string
+          customer_name?: string
+          fabric_price?: number | null
+          id?: string
+          kdv_amount?: number | null
+          kdv_rate?: number | null
+          kumesci?: string | null
+          mal_tanimi?: string | null
+          merch_alt_grup?: string | null
+          model_image?: string | null
+          model_name: string
+          option_price?: string | null
+          order_code?: string | null
+          order_date?: string
+          po_number: string
+          profit_amount?: number | null
+          profit_margin?: number | null
+          season?: string | null
+          status?: string | null
+          teslim_yeri?: string | null
+          total_amount?: number | null
+          total_quantity?: number
+          total_with_kdv?: number | null
+          unit_price?: number | null
+          updated_at?: string
+          user_id: string
+          yd_inspection_date?: string | null
+          yi_inspection_date?: string | null
+        }
+        Update: {
+          assigned_to?: string | null
+          brand?: string | null
+          created_at?: string
+          customer_name?: string
+          fabric_price?: number | null
+          id?: string
+          kdv_amount?: number | null
+          kdv_rate?: number | null
+          kumesci?: string | null
+          mal_tanimi?: string | null
+          merch_alt_grup?: string | null
+          model_image?: string | null
+          model_name?: string
+          option_price?: string | null
+          order_code?: string | null
+          order_date?: string
+          po_number?: string
+          profit_amount?: number | null
+          profit_margin?: number | null
+          season?: string | null
+          status?: string | null
+          teslim_yeri?: string | null
+          total_amount?: number | null
+          total_quantity?: number
+          total_with_kdv?: number | null
+          unit_price?: number | null
+          updated_at?: string
+          user_id?: string
+          yd_inspection_date?: string | null
+          yi_inspection_date?: string | null
+        }
+        Relationships: []
+      }
       chat_group_members: {
         Row: {
           group_id: string
@@ -257,6 +483,7 @@ export type Database = {
           status: Database["public"]["Enums"]["app_status"]
           updated_at: string
           user_id: string
+          user_type: Database["public"]["Enums"]["user_type"] | null
           username: string
         }
         Insert: {
@@ -267,6 +494,7 @@ export type Database = {
           status?: Database["public"]["Enums"]["app_status"]
           updated_at?: string
           user_id: string
+          user_type?: Database["public"]["Enums"]["user_type"] | null
           username: string
         }
         Update: {
@@ -277,6 +505,7 @@ export type Database = {
           status?: Database["public"]["Enums"]["app_status"]
           updated_at?: string
           user_id?: string
+          user_type?: Database["public"]["Enums"]["user_type"] | null
           username?: string
         }
         Relationships: []
@@ -502,6 +731,16 @@ export type Database = {
     Enums: {
       app_role: "admin" | "user"
       app_status: "pending" | "approved" | "rejected"
+      user_type:
+        | "admin"
+        | "buyer"
+        | "fabric"
+        | "planlama"
+        | "fason"
+        | "kesim_takip"
+        | "tedarik_muduru"
+        | "isletme_muduru"
+        | "tedarik_sorumlusu"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -631,6 +870,17 @@ export const Constants = {
     Enums: {
       app_role: ["admin", "user"],
       app_status: ["pending", "approved", "rejected"],
+      user_type: [
+        "admin",
+        "buyer",
+        "fabric",
+        "planlama",
+        "fason",
+        "kesim_takip",
+        "tedarik_muduru",
+        "isletme_muduru",
+        "tedarik_sorumlusu",
+      ],
     },
   },
 } as const

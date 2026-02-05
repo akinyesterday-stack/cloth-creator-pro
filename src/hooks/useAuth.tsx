@@ -10,6 +10,7 @@ interface Profile {
   full_name: string;
   email: string;
   status: "pending" | "approved" | "rejected";
+  user_type?: "admin" | "buyer" | "fabric" | "planlama" | "fason" | "kesim_takip" | "tedarik_muduru" | "isletme_muduru" | "tedarik_sorumlusu";
   created_at: string;
   updated_at: string;
 }
@@ -21,6 +22,7 @@ interface AuthContextType {
   isAdmin: boolean;
   isApproved: boolean;
   isLoading: boolean;
+  userType: string;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
   signUp: (email: string, password: string, username: string, fullName: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
@@ -175,6 +177,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const isApproved = profile?.status === "approved";
+  const userType = profile?.user_type || "admin";
 
   return (
     <AuthContext.Provider
@@ -185,6 +188,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         isAdmin,
         isApproved,
         isLoading,
+        userType,
         signIn,
         signUp,
         signOut,
