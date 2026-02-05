@@ -40,6 +40,7 @@ interface FabricItem {
   fiyat: number;
   priceExpected?: boolean; // Üreticiden fiyat bekleniyor
   printType?: string; // baskılı tipi: fon, zemin, boyalı, pigment, aşındırma
+   boyahane?: string; // boyahane ismi
 }
 
 // Print type options for "Baskılı" fabrics
@@ -49,6 +50,26 @@ const PRINT_TYPE_OPTIONS = [
   { value: "boyalı", label: "Boyalı", color: "E4D4F4" },
   { value: "pigment", label: "Pigment", color: "F4D4E4" },
   { value: "aşındırma", label: "Aşındırma", color: "D4E4F4" },
+];
+
+// Standard dyehouse options
+const STANDARD_BOYAHANES = [
+  "TÜBAŞ",
+  "SEZGİNLER", 
+  "MEM TEKSTİL",
+  "ÜNTEKS",
+  "İNTEKS",
+  "UNİVERSAL",
+  "BOYBO",
+  "TORAMAN",
+  "CANHAS TEKSTİL",
+  "HAN TEKSTİL",
+  "KÖSEMLER",
+  "SANKO",
+  "LERAS DANTEL",
+  "MAYTEKS",
+  "ÖZEL ÖRME",
+  "ÖZEN MENSUCAT",
 ];
 
 interface ModelGroup {
@@ -116,6 +137,12 @@ export const CostCalculator = forwardRef<HTMLDivElement, CostCalculatorProps>(fu
   // Print type state (for baskılı fabrics)
   const [selectedPrintType, setSelectedPrintType] = useState("");
   
+  // Boyahane (dyehouse) states
+  const [defaultBoyahane, setDefaultBoyahane] = useState("");
+  const [selectedBoyahane, setSelectedBoyahane] = useState("");
+  const [customBoyahanes, setCustomBoyahanes] = useState<string[]>([]);
+  const [isCustomBoyahaneMode, setIsCustomBoyahaneMode] = useState(false);
+  
   // Recent items tracking
   const [recentFabrics, setRecentFabrics] = useState<string[]>([]);
   const [recentUsageAreas, setRecentUsageAreas] = useState<string[]>([]);
@@ -158,6 +185,16 @@ export const CostCalculator = forwardRef<HTMLDivElement, CostCalculatorProps>(fu
             gramaj: p.gramaj,
             fiyat: Number(p.fiyat)
           })));
+        }
+
+        // Load custom boyahanes from localStorage
+        const savedBoyahanes = localStorage.getItem(`customBoyahanes-${user.id}`);
+        if (savedBoyahanes) {
+          try {
+            setCustomBoyahanes(JSON.parse(savedBoyahanes));
+          } catch (e) {
+            console.error("Error parsing saved boyahanes:", e);
+          }
         }
 
         // If no fabric types exist, load defaults automatically for new users
@@ -264,6 +301,9 @@ export const CostCalculator = forwardRef<HTMLDivElement, CostCalculatorProps>(fu
   const handleFabricChange = (value: string) => {
     setSelectedFabric(value);
     
+    // Reset item-specific boyahane to use default when fabric changes
+    setSelectedBoyahane(defaultBoyahane);
+    
     // First check fabric prices (has fiyat)
     const priceRecord = fabricPrices.find(p => p.fabric_name === value);
     if (priceRecord) {
@@ -280,6 +320,21 @@ export const CostCalculator = forwardRef<HTMLDivElement, CostCalculatorProps>(fu
       setGramaj(fabric.gramaj);
     }
   };
+
+  // Save custom boyahane
+  const saveCustomBoyahane = (name: string) => {
+    if (!user || !name.trim()) return;
+    const trimmedName = name.trim().toUpperCase();
+    if (!customBoyahanes.includes(trimmedName) && !STANDARD_BOYAHANES.includes(trimmedName)) {
+      const updated = [...customBoyahanes, trimmedName];
+      setCustomBoyahanes(updated);
+      localStorage.setItem(`customBoyahanes-${user.id}`, JSON.stringify(updated));
+      toast.success(`"${trimmedName}" boyahane listesine eklendi`);
+    }
+  };
+
+  // Get all boyahanes (standard + custom)
+  const allBoyahanes = [...STANDARD_BOYAHANES, ...customBoyahanes];
 
   const handleAddModel = () => {
     if (!currentModelName.trim()) return;
@@ -333,6 +388,7 @@ export const CostCalculator = forwardRef<HTMLDivElement, CostCalculatorProps>(fu
       fiyat: priceExpected ? 0 : fiyat,
       priceExpected,
       printType: isBaskili ? selectedPrintType : undefined,
+      boyahane: selectedBoyahane || defaultBoyahane || undefined,
     };
 
     setModels(models.map(model => 
@@ -366,6 +422,12 @@ export const CostCalculator = forwardRef<HTMLDivElement, CostCalculatorProps>(fu
       return [selectedUsage, ...filtered].slice(0, 5);
     });
     
+    // Save custom boyahane if entered
+    const boyahaneValue = selectedBoyahane || defaultBoyahane;
+    if (boyahaneValue && !allBoyahanes.includes(boyahaneValue)) {
+      saveCustomBoyahane(boyahaneValue);
+    }
+    
     // Reset form
     setSelectedFabric("");
     setSelectedUsage("");
@@ -374,6 +436,7 @@ export const CostCalculator = forwardRef<HTMLDivElement, CostCalculatorProps>(fu
     setFiyat(0);
     setPriceExpected(false);
     setSelectedPrintType("");
+    setSelectedBoyahane(defaultBoyahane); // Reset to default
   };
 
   // Toggle item selection
@@ -653,6 +716,7 @@ export const CostCalculator = forwardRef<HTMLDivElement, CostCalculatorProps>(fu
       { header: 'Gramaj (GR)', key: 'gramaj', width: 14 },
       { header: 'Fiyat (₺)', key: 'fiyat', width: 14 },
       { header: 'Birim Gramaj', key: 'birimGramaj', width: 14 },
+      { header: 'Boyahane', key: 'boyahane', width: 18 },
     ];
 
     // Style header row
@@ -694,6 +758,7 @@ export const CostCalculator = forwardRef<HTMLDivElement, CostCalculatorProps>(fu
           gramaj: item.gramaj,
           fiyat: item.priceExpected ? 'FİYAT BEKLENİYOR' : item.fiyat,
           birimGramaj: '', // Empty for manual entry
+          boyahane: item.boyahane || '',
         });
 
         row.height = 60;
@@ -1151,6 +1216,38 @@ export const CostCalculator = forwardRef<HTMLDivElement, CostCalculatorProps>(fu
               </div>
             </div>
 
+            {/* Default Boyahane Section */}
+            <div className="p-4 bg-gradient-to-r from-amber-500/10 to-orange-500/10 rounded-xl border border-amber-500/20">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+                <div className="flex-1 space-y-2">
+                  <Label className="text-sm font-semibold text-foreground/80 flex items-center gap-2">
+                    <Package className="h-4 w-4 text-amber-600" />
+                    Varsayılan Boyahane
+                  </Label>
+                  <p className="text-xs text-muted-foreground">
+                    Seçilen boyahane tüm kalemlere otomatik uygulanır. Kalem bazında değiştirilebilir.
+                  </p>
+                </div>
+                <div className="w-full sm:w-64">
+                  <SearchableCombobox
+                    options={allBoyahanes}
+                    value={defaultBoyahane}
+                    onValueChange={(value) => {
+                      setDefaultBoyahane(value);
+                      setSelectedBoyahane(value);
+                      // Save custom if not in list
+                      if (value && !allBoyahanes.includes(value)) {
+                        saveCustomBoyahane(value);
+                      }
+                    }}
+                    placeholder="Boyahane seçin..."
+                    searchPlaceholder="Boyahane ara..."
+                    allowCustom={true}
+                  />
+                </div>
+              </div>
+            </div>
+
             {/* Form Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               <div className="space-y-3">
@@ -1261,6 +1358,27 @@ export const CostCalculator = forwardRef<HTMLDivElement, CostCalculatorProps>(fu
                 </div>
               )}
 
+              {/* Item-specific Boyahane (different from default) */}
+              {defaultBoyahane && (
+                <div className="space-y-3">
+                  <Label className="text-sm font-semibold text-foreground/80 flex items-center gap-2">
+                    Boyahane
+                    {selectedBoyahane !== defaultBoyahane && (
+                      <span className="text-xs text-amber-600">(farklı)</span>
+                    )}
+                  </Label>
+                  <SearchableCombobox
+                    options={allBoyahanes}
+                    value={selectedBoyahane}
+                    onValueChange={setSelectedBoyahane}
+                    placeholder={defaultBoyahane}
+                    searchPlaceholder="Farklı boyahane..."
+                    allowCustom={true}
+                    className="h-11"
+                  />
+                </div>
+              )}
+
               <div className="flex items-end">
                 <Button
                   onClick={handleAddItem}
@@ -1286,6 +1404,7 @@ export const CostCalculator = forwardRef<HTMLDivElement, CostCalculatorProps>(fu
                         <th className="text-right py-4 px-5 font-semibold text-sm text-foreground/70">En (CM)</th>
                         <th className="text-right py-4 px-5 font-semibold text-sm text-foreground/70">Gramaj (GR)</th>
                         <th className="text-right py-4 px-5 font-semibold text-sm text-foreground/70">Fiyat</th>
+                        <th className="text-left py-4 px-5 font-semibold text-sm text-foreground/70">Boyahane</th>
                         <th className="w-24"></th>
                       </tr>
                     </thead>
@@ -1366,6 +1485,9 @@ export const CostCalculator = forwardRef<HTMLDivElement, CostCalculatorProps>(fu
                               <td className="py-4 px-5 text-sm text-right font-mono">{item.gramaj}</td>
                               <td className="py-4 px-5 text-sm text-right font-bold text-primary">
                                 ₺{item.fiyat.toFixed(2)}
+                              </td>
+                              <td className="py-4 px-5 text-sm text-muted-foreground">
+                                {item.boyahane || "-"}
                               </td>
                               <td className="py-4 px-3">
                                 <div className="flex gap-1">

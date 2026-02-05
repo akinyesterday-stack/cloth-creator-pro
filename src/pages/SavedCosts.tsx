@@ -42,6 +42,7 @@ interface FabricItem {
   fiyat: number;
   priceExpected?: boolean;
   printType?: string; // baskılı tipi: fon, zemin, boyalı, pigment, aşındırma
+   boyahane?: string; // boyahane ismi
 }
 
 interface SavedCost {
@@ -359,14 +360,15 @@ const SavedCosts = () => {
     setImportDialogOpen(true);
   };
 
-  // Toggle row selection for import
-  const handleToggleRowForImport = (itemId: string) => {
+  // Toggle row selection for import - use index as fallback if id is undefined
+  const handleToggleRowForImport = (itemId: string, index: number) => {
+    const key = itemId || `item-${index}`;
     setSelectedRowsForImport(prev => {
       const next = new Set(prev);
-      if (next.has(itemId)) {
-        next.delete(itemId);
+      if (next.has(key)) {
+        next.delete(key);
       } else {
-        next.add(itemId);
+        next.add(key);
       }
       return next;
     });
@@ -375,10 +377,11 @@ const SavedCosts = () => {
   // Select all rows for import
   const handleSelectAllRowsForImport = () => {
     if (!importSourceCost) return;
-    if (selectedRowsForImport.size === importSourceCost.items.length) {
+    const allKeys = importSourceCost.items.map((item, idx) => item.id || `item-${idx}`);
+    if (selectedRowsForImport.size === allKeys.length) {
       setSelectedRowsForImport(new Set());
     } else {
-      setSelectedRowsForImport(new Set(importSourceCost.items.map(i => i.id)));
+      setSelectedRowsForImport(new Set(allKeys));
     }
   };
 
@@ -389,7 +392,10 @@ const SavedCosts = () => {
       return;
     }
 
-    const selectedItems = importSourceCost.items.filter(item => selectedRowsForImport.has(item.id));
+    const selectedItems = importSourceCost.items.filter((item, idx) => {
+      const key = item.id || `item-${idx}`;
+      return selectedRowsForImport.has(key);
+    });
     const itemsData = encodeURIComponent(JSON.stringify({
       modelName: importModelName.trim(),
       items: selectedItems,
@@ -482,6 +488,7 @@ const SavedCosts = () => {
       { header: 'Gramaj (GR)', key: 'gramaj', width: 14 },
       { header: 'Fiyat (₺)', key: 'fiyat', width: 14 },
       { header: 'Birim Gramaj', key: 'birimGramaj', width: 14 },
+      { header: 'Boyahane', key: 'boyahane', width: 18 },
     ];
 
     const headerRow = worksheet.getRow(1);
@@ -521,6 +528,7 @@ const SavedCosts = () => {
           gramaj: item.gramaj,
           fiyat: item.priceExpected ? 'FİYAT BEKLENİYOR' : item.fiyat,
           birimGramaj: '',
+          boyahane: item.boyahane || '',
         });
 
         row.height = 60;
@@ -1097,6 +1105,15 @@ const SavedCosts = () => {
                         className="h-8"
                       />
                     </div>
+                    <div>
+                      <label className="text-xs text-muted-foreground">Boyahane</label>
+                      <Input
+                        placeholder="Boyahane"
+                        value={item.boyahane || ""}
+                        onChange={(e) => handleUpdateItem(idx, "boyahane", e.target.value)}
+                        className="h-8"
+                      />
+                    </div>
                   </div>
                   <Button
                     variant="ghost"
@@ -1156,20 +1173,23 @@ const SavedCosts = () => {
                   {importSourceCost.items.map((item, idx) => (
                     <div 
                       key={item.id || idx} 
-                      className={`flex items-center gap-3 p-3 border rounded-lg cursor-pointer transition-colors ${
-                        selectedRowsForImport.has(item.id) ? 'bg-primary/10 border-primary/50' : 'hover:bg-muted/50'
+                      className={`flex items-center gap-3 p-3 border rounded-lg cursor-pointer transition-colors hover:bg-muted/50 ${
+                        selectedRowsForImport.has(item.id || `item-${idx}`) ? 'bg-primary/10 border-primary/50' : ''
                       }`}
-                      onClick={() => handleToggleRowForImport(item.id)}
+                      onClick={() => handleToggleRowForImport(item.id, idx)}
                     >
                       <Checkbox
-                        checked={selectedRowsForImport.has(item.id)}
-                        onCheckedChange={() => handleToggleRowForImport(item.id)}
+                        checked={selectedRowsForImport.has(item.id || `item-${idx}`)}
+                        onCheckedChange={() => handleToggleRowForImport(item.id, idx)}
                       />
                       <div className="flex-1 grid grid-cols-2 md:grid-cols-4 gap-2 text-sm">
                         <span className="font-medium">{item.fabricType}</span>
                         <span className="text-muted-foreground">{item.usageArea}</span>
                         <span className="text-muted-foreground">{item.en}cm / {item.gramaj}gr</span>
-                        <span className="font-medium text-right">₺{item.fiyat.toFixed(2)}</span>
+                        <span className="font-medium text-right">
+                          ₺{item.fiyat.toFixed(2)}
+                          {item.boyahane && <span className="text-xs text-muted-foreground ml-1">({item.boyahane})</span>}
+                        </span>
                       </div>
                     </div>
                   ))}
