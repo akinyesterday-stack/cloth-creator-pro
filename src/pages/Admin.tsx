@@ -10,6 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { 
   Shield, 
   Users, 
@@ -22,8 +23,25 @@ import {
   UserX,
   UserPlus,
   Pencil,
-  Trash2
+  Trash2,
+  ShoppingBag,
+  Factory,
+  Building,
+  Scissors,
+  Truck
 } from "lucide-react";
+
+const USER_TYPES = [
+  { value: "admin", label: "Admin", icon: Shield },
+  { value: "buyer", label: "Buyer (Satın Almacı)", icon: ShoppingBag },
+  { value: "fabric", label: "Fabric (Kumaş)", icon: Factory },
+  { value: "planlama", label: "Planlama", icon: Building },
+  { value: "fason", label: "Fason", icon: Factory },
+  { value: "kesim_takip", label: "Kesim Takip", icon: Scissors },
+  { value: "tedarik_muduru", label: "Tedarik Müdürü", icon: Truck },
+  { value: "isletme_muduru", label: "İşletme Müdürü", icon: Building },
+  { value: "tedarik_sorumlusu", label: "Tedarik Sorumlusu", icon: UserCheck },
+] as const;
 
 interface PendingUser {
   id: string;
@@ -32,6 +50,7 @@ interface PendingUser {
   full_name: string;
   email: string;
   status: "pending" | "approved" | "rejected";
+  user_type: string | null;
   created_at: string;
 }
 
@@ -51,6 +70,7 @@ export default function Admin() {
   const [newFullName, setNewFullName] = useState("");
   const [newEmail, setNewEmail] = useState("");
   const [newPassword, setNewPassword] = useState("");
+  const [newUserType, setNewUserType] = useState<string>("admin");
   const [isCreating, setIsCreating] = useState(false);
 
   // Edit user
@@ -58,6 +78,7 @@ export default function Admin() {
   const [editFullName, setEditFullName] = useState("");
   const [editEmail, setEditEmail] = useState("");
   const [editPassword, setEditPassword] = useState("");
+  const [editUserType, setEditUserType] = useState<string>("admin");
   const [isSavingEdit, setIsSavingEdit] = useState(false);
 
   useEffect(() => {
@@ -225,7 +246,7 @@ export default function Admin() {
       if (authError) throw authError;
 
       if (authData.user) {
-        // Create profile as approved
+        // Create profile as approved with user_type
         const { error: profileError } = await supabase
           .from("profiles")
           .insert({
@@ -234,19 +255,20 @@ export default function Admin() {
             full_name: newFullName.trim(),
             email: newEmail.trim(),
             status: "approved",
+            user_type: newUserType as "admin" | "buyer" | "fabric" | "planlama" | "fason" | "kesim_takip" | "tedarik_muduru" | "isletme_muduru" | "tedarik_sorumlusu",
           });
 
         if (profileError) throw profileError;
 
-        // Add user role
+        // Add user role (admin role for admin type, user role for others)
         await supabase.from("user_roles").insert({
           user_id: authData.user.id,
-          role: "user",
+          role: newUserType === "admin" ? "admin" : "user",
         });
 
         toast({
           title: "Kullanıcı Oluşturuldu",
-          description: `${newFullName} başarıyla eklendi.`,
+          description: `${newFullName} (${USER_TYPES.find(t => t.value === newUserType)?.label}) başarıyla eklendi.`,
         });
 
         setShowAddUser(false);
@@ -254,6 +276,7 @@ export default function Admin() {
         setNewFullName("");
         setNewEmail("");
         setNewPassword("");
+        setNewUserType("admin");
         fetchUsers();
       }
     } catch (error: any) {
@@ -274,6 +297,7 @@ export default function Admin() {
     setEditFullName(profile.full_name);
     setEditEmail(profile.email);
     setEditPassword("");
+    setEditUserType(profile.user_type || "admin");
   };
 
   const handleSaveEdit = async () => {
@@ -287,6 +311,7 @@ export default function Admin() {
         .update({
           full_name: editFullName.trim(),
           email: editEmail.trim(),
+          user_type: editUserType as "admin" | "buyer" | "fabric" | "planlama" | "fason" | "kesim_takip" | "tedarik_muduru" | "isletme_muduru" | "tedarik_sorumlusu",
         })
         .eq("id", editingUser.id);
 
@@ -502,6 +527,24 @@ export default function Admin() {
                           placeholder="••••••••"
                         />
                       </div>
+                      <div>
+                        <Label>Kullanıcı Tipi</Label>
+                        <Select value={newUserType} onValueChange={setNewUserType}>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Kullanıcı tipi seçin" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {USER_TYPES.map((type) => (
+                              <SelectItem key={type.value} value={type.value}>
+                                <div className="flex items-center gap-2">
+                                  <type.icon className="h-4 w-4" />
+                                  {type.label}
+                                </div>
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
                       <Button
                         className="w-full"
                         onClick={handleCreateUser}
@@ -533,7 +576,14 @@ export default function Admin() {
                         className="flex items-center justify-between p-4 hover:bg-secondary/30 transition-colors"
                       >
                         <div className="space-y-1">
-                          <p className="font-medium">{profile.full_name}</p>
+                          <div className="flex items-center gap-2">
+                            <p className="font-medium">{profile.full_name}</p>
+                            {profile.user_type && (
+                              <Badge variant="outline" className="text-xs">
+                                {USER_TYPES.find(t => t.value === profile.user_type)?.label || profile.user_type}
+                              </Badge>
+                            )}
+                          </div>
                           <p className="text-sm text-muted-foreground">{profile.email}</p>
                           <p className="text-xs text-muted-foreground">
                             @{profile.username}
@@ -616,6 +666,24 @@ export default function Admin() {
                   value={editEmail}
                   onChange={(e) => setEditEmail(e.target.value)}
                 />
+              </div>
+              <div>
+                <Label>Kullanıcı Tipi</Label>
+                <Select value={editUserType} onValueChange={setEditUserType}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Kullanıcı tipi seçin" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {USER_TYPES.map((type) => (
+                      <SelectItem key={type.value} value={type.value}>
+                        <div className="flex items-center gap-2">
+                          <type.icon className="h-4 w-4" />
+                          {type.label}
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
               <div>
                 <Label htmlFor="edit-password">Yeni Şifre (opsiyonel)</Label>
