@@ -69,9 +69,19 @@ export default function Auth() {
     }
   }, [user, profile, isApproved, navigate]);
 
-  const handleUserSelect = (userProfile: UserProfile) => {
-    setSelectedUser(userProfile);
-    setPassword("");
+  // Direct login without password (for demo/presentation mode)
+  const handleUserSelect = async (userProfile: UserProfile) => {
+    setIsLoading(true);
+    
+    // Use demo password for all demo users
+    const { error } = await signIn(userProfile.email, "demo123");
+    
+    if (error) {
+      // Try with original passwords for existing users
+      setSelectedUser(userProfile);
+      setPassword("");
+      setIsLoading(false);
+    }
   };
 
   const handleLogin = async (e: React.FormEvent) => {
