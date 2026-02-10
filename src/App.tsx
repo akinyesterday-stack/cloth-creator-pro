@@ -14,6 +14,7 @@ import Reports from "./pages/Reports";
 import NotFound from "./pages/NotFound";
 import BuyerDashboard from "./pages/BuyerDashboard";
 import BuyerNewOrder from "./pages/BuyerNewOrder";
+import TedarikDashboard from "./pages/TedarikDashboard";
 import { Loader2 } from "lucide-react";
 import { OrderNotificationListener } from "@/components/OrderNotificationListener";
 
@@ -41,6 +42,11 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   // Redirect buyer users to their dashboard
   if (userType === "buyer" && window.location.pathname === "/") {
     return <Navigate to="/buyer" replace />;
+  }
+
+  // Redirect tedarik_sorumlusu to their dashboard
+  if (userType === "tedarik_sorumlusu" && window.location.pathname === "/") {
+    return <Navigate to="/tedarik" replace />;
   }
 
   return <>{children}</>;
@@ -131,6 +137,14 @@ function AppRoutes() {
           <BuyerRoute>
             <BuyerDashboard />
           </BuyerRoute>
+        }
+      />
+      <Route
+        path="/tedarik"
+        element={
+          <ProtectedRoute>
+            <TedarikDashboard />
+          </ProtectedRoute>
         }
       />
       <Route

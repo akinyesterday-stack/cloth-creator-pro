@@ -665,6 +665,39 @@ export type Database = {
         }
         Relationships: []
       }
+      team_activity_log: {
+        Row: {
+          action_type: string
+          created_at: string
+          description: string
+          id: string
+          model_name: string | null
+          related_order_id: string | null
+          team_leader_id: string
+          user_id: string
+        }
+        Insert: {
+          action_type?: string
+          created_at?: string
+          description: string
+          id?: string
+          model_name?: string | null
+          related_order_id?: string | null
+          team_leader_id: string
+          user_id: string
+        }
+        Update: {
+          action_type?: string
+          created_at?: string
+          description?: string
+          id?: string
+          model_name?: string | null
+          related_order_id?: string | null
+          team_leader_id?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       team_members: {
         Row: {
           created_at: string
