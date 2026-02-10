@@ -405,6 +405,50 @@ export type Database = {
           },
         ]
       }
+      order_notifications: {
+        Row: {
+          created_at: string
+          id: string
+          is_seen: boolean
+          model_name: string | null
+          order_id: string | null
+          po_number: string | null
+          recipient_id: string
+          sender_id: string
+          sender_name: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_seen?: boolean
+          model_name?: string | null
+          order_id?: string | null
+          po_number?: string | null
+          recipient_id: string
+          sender_id: string
+          sender_name?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_seen?: boolean
+          model_name?: string | null
+          order_id?: string | null
+          po_number?: string | null
+          recipient_id?: string
+          sender_id?: string
+          sender_name?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "order_notifications_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "buyer_orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       orders: {
         Row: {
           created_at: string
@@ -618,6 +662,30 @@ export type Database = {
           title?: string
           updated_at?: string
           user_id?: string
+        }
+        Relationships: []
+      }
+      team_members: {
+        Row: {
+          created_at: string
+          id: string
+          member_id: string
+          role: string
+          team_leader_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          member_id: string
+          role?: string
+          team_leader_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          member_id?: string
+          role?: string
+          team_leader_id?: string
         }
         Relationships: []
       }

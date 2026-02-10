@@ -230,6 +230,41 @@ export default function BuyerNewOrder() {
         if (itemsError) throw itemsError;
       }
 
+      // Send notifications to tedarik sorumlusu and their team
+      if (sendToTedarik && orderData) {
+        const senderProfile = await supabase
+          .from("profiles")
+          .select("full_name")
+          .eq("user_id", user!.id)
+          .single();
+
+        const senderName = senderProfile.data?.full_name || "Buyer";
+
+        // Get team members of the assigned tedarik sorumlusu
+        const { data: teamMembers } = await supabase
+          .from("team_members")
+          .select("member_id")
+          .eq("team_leader_id", assignedTo);
+
+        // Collect all recipient IDs (tedarik sorumlusu + team)
+        const recipientIds = [assignedTo];
+        if (teamMembers) {
+          recipientIds.push(...teamMembers.map(tm => tm.member_id));
+        }
+
+        // Create notifications for all recipients
+        const notifications = recipientIds.map(rid => ({
+          order_id: orderData.id,
+          recipient_id: rid,
+          sender_id: user!.id,
+          sender_name: senderName,
+          po_number: poNumber,
+          model_name: modelName,
+        }));
+
+        await supabase.from("order_notifications").insert(notifications);
+      }
+
       toast({
         title: "Başarılı",
         description: sendToTedarik 
