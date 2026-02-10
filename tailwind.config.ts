@@ -96,6 +96,13 @@ export default {
           from: { opacity: "0", transform: "scale(0.95)" },
           to: { opacity: "1", transform: "scale(1)" },
         },
+        "firework-particle": {
+          "0%": { transform: "translate(0, 0) scale(1)", opacity: "1" },
+          "100%": { 
+            transform: "translate(calc(cos(var(--angle)) * var(--speed)), calc(sin(var(--angle)) * var(--speed))) scale(0)",
+            opacity: "0" 
+          },
+        },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
@@ -103,6 +110,7 @@ export default {
         "fade-in": "fade-in 0.4s ease-out",
         "slide-in": "slide-in 0.3s ease-out",
         "scale-up": "scale-up 0.3s ease-out",
+        "firework-particle": "firework-particle 2s ease-out forwards",
       },
     },
   },

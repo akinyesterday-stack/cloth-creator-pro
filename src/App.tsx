@@ -15,6 +15,7 @@ import NotFound from "./pages/NotFound";
 import BuyerDashboard from "./pages/BuyerDashboard";
 import BuyerNewOrder from "./pages/BuyerNewOrder";
 import { Loader2 } from "lucide-react";
+import { OrderNotificationListener } from "@/components/OrderNotificationListener";
 
 const queryClient = new QueryClient();
 
@@ -152,6 +153,7 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <AuthProvider>
+          <OrderNotificationListener />
           <AppRoutes />
         </AuthProvider>
       </BrowserRouter>
