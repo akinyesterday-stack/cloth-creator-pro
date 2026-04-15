@@ -107,58 +107,8 @@ export function IncomingOrders() {
   };
 
   const downloadPdf = async (order: BuyerOrder) => {
-    const { default: jsPDF } = await import("jspdf");
-    const doc = new jsPDF();
-
-    // Header
-    doc.setFontSize(18);
-    doc.text("SİPARİŞ FORMU", 105, 20, { align: "center" });
-
-    doc.setFontSize(10);
-    doc.text(`PO: ${order.po_number}`, 14, 35);
-    doc.text(`Tarih: ${format(new Date(order.created_at), "dd.MM.yyyy")}`, 14, 42);
-    doc.text(`Model: ${order.model_name}`, 14, 49);
-    doc.text(`Marka: ${order.brand || "-"}`, 14, 56);
-    doc.text(`Sezon: ${order.season || "-"}`, 14, 63);
-    doc.text(`Musteri: ${order.customer_name}`, 14, 70);
-    doc.text(`Toplam Adet: ${order.total_quantity}`, 14, 77);
-    doc.text(`Birim Fiyat: ${order.unit_price?.toFixed(2) || "0"} TL`, 14, 84);
-    doc.text(`Toplam: ${order.total_amount?.toFixed(2) || "0"} TL`, 14, 91);
-    doc.text(`KDV Dahil: ${order.total_with_kdv?.toFixed(2) || "0"} TL`, 14, 98);
-
-    // Fetch items for PDF
-    const { data: items } = await supabase
-      .from("buyer_order_items")
-      .select("*")
-      .eq("order_id", order.id);
-
-    if (items && items.length > 0) {
-      let y = 115;
-      doc.setFontSize(12);
-      doc.text("Siparis Kalemleri", 14, y);
-      y += 10;
-
-      doc.setFontSize(8);
-      const headers = ["Model", "Option", "0m-1m", "1m-3m", "3m-6m", "6m-9m", "Asorti", "Toplam"];
-      headers.forEach((h, i) => doc.text(h, 14 + i * 24, y));
-      y += 7;
-
-      doc.setFontSize(7);
-      for (const item of items) {
-        if (y > 270) { doc.addPage(); y = 20; }
-        doc.text(item.model || "-", 14, y);
-        doc.text(item.option_name || "-", 38, y);
-        doc.text(String(item.size_0m_1m || 0), 62, y);
-        doc.text(String(item.size_1m_3m || 0), 86, y);
-        doc.text(String(item.size_3m_6m || 0), 110, y);
-        doc.text(String(item.size_6m_9m || 0), 134, y);
-        doc.text(String(item.asorti_count || 0), 158, y);
-        doc.text(String(item.total_quantity || 0), 182, y);
-        y += 7;
-      }
-    }
-
-    doc.save(`Siparis_${order.po_number}.pdf`);
+    const { generateOrderPdf } = await import("@/lib/orderPdf");
+    await generateOrderPdf(order.id);
   };
 
   if (loading) {
