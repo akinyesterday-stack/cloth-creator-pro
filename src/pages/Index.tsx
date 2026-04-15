@@ -4,14 +4,15 @@ import { CostCalculator } from "@/components/CostCalculator";
 import { Dashboard } from "@/components/Dashboard";
 import { ExcelSpreadsheet } from "@/components/ExcelSpreadsheet";
 import { LiveChat } from "@/components/LiveChat";
+import { NotificationsPage } from "@/components/NotificationsPage";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Calculator, LayoutDashboard, ShoppingCart } from "lucide-react";
+import { Calculator, LayoutDashboard, ShoppingCart, Bell } from "lucide-react";
 
 const Index = () => {
   const [isRadioOpen, setIsRadioOpen] = useState(false);
   const [isRadioMinimized, setIsRadioMinimized] = useState(false);
   const [activeTab, setActiveTab] = useState("dashboard");
-  const [tabOrder, setTabOrder] = useState(["dashboard", "orders", "calculator"]);
+  const [tabOrder, setTabOrder] = useState(["dashboard", "orders", "calculator", "notifications"]);
 
   const handleRadioToggle = () => {
     if (isRadioOpen) {
@@ -53,6 +54,11 @@ const Index = () => {
           onRadioMinimize={handleRadioMinimize}
         />
       )
+    },
+    notifications: {
+      label: "Bildirimler",
+      icon: <Bell className="h-4 w-4" />,
+      content: <NotificationsPage />
     }
   };
 

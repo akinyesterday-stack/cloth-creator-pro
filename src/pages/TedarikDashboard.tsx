@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { Header } from "@/components/Header";
 import { TeamManager } from "@/components/TeamManager";
 import { IncomingOrders } from "@/components/IncomingOrders";
+import { NotificationsPage } from "@/components/NotificationsPage";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -219,50 +220,7 @@ const TedarikDashboard = () => {
           </TabsContent>
 
           <TabsContent value="notifications">
-            <Card className="modern-card">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Bell className="h-5 w-5" />
-                  Sipariş Bildirimleri
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                {notifications.length === 0 ? (
-                  <p className="text-sm text-muted-foreground text-center py-8">
-                    Henüz bildirim bulunmuyor.
-                  </p>
-                ) : (
-                  <div className="space-y-3">
-                    {notifications.map(n => (
-                      <div
-                        key={n.id}
-                        className={`flex items-center justify-between p-4 rounded-lg border transition-colors cursor-pointer ${
-                          n.is_seen
-                            ? "bg-secondary/20 border-border/50"
-                            : "bg-primary/10 border-primary/30 shadow-sm"
-                        }`}
-                        onClick={() => !n.is_seen && markAsSeen(n.id)}
-                      >
-                        <div className="flex items-center gap-3">
-                          {!n.is_seen && <div className="w-2.5 h-2.5 rounded-full bg-primary animate-pulse" />}
-                          <div>
-                            <p className="font-semibold text-sm">
-                              🎉 {n.sender_name || "Buyer"} yeni sipariş gönderdi!
-                            </p>
-                            <p className="text-xs text-muted-foreground mt-1">
-                              PO: {n.po_number} • Model: {n.model_name}
-                            </p>
-                          </div>
-                        </div>
-                        <span className="text-xs text-muted-foreground whitespace-nowrap">
-                          {format(new Date(n.created_at), "dd MMM HH:mm", { locale: tr })}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
+            <NotificationsPage />
           </TabsContent>
 
           <TabsContent value="orders">

@@ -199,4 +199,57 @@
       box-shadow: 0 0 0 15px hsl(var(--primary) / 0);
     }
   }
+
+  /* Fireworks celebration text */
+  .fireworks-text-container {
+    text-align: center;
+    animation: fireworksTextPulse 0.5s ease-in-out infinite alternate;
+  }
+
+  .fireworks-main-text {
+    font-size: 3.5rem;
+    font-weight: 800;
+    color: #fff;
+    text-shadow: 
+      0 0 20px #ff0,
+      0 0 40px #ff6600,
+      0 0 60px #f00,
+      0 0 80px #ff0,
+      2px 2px 4px rgba(0,0,0,0.8);
+    animation: fireworksFlash 0.3s ease-in-out infinite alternate,
+               fireworksScale 1s ease-in-out infinite alternate;
+    letter-spacing: 2px;
+  }
+
+  .fireworks-sub-text {
+    font-size: 1.2rem;
+    color: #fff;
+    text-shadow: 0 0 10px #0ff, 0 0 20px #0ff, 2px 2px 4px rgba(0,0,0,0.8);
+    margin-top: 12px;
+    animation: fireworksFadeIn 1s ease-out;
+    opacity: 0.9;
+  }
+
+  @keyframes fireworksFlash {
+    0% { color: #fff; text-shadow: 0 0 20px #ff0, 0 0 40px #ff6600, 0 0 60px #f00; }
+    25% { color: #ffcc00; text-shadow: 0 0 20px #f0f, 0 0 40px #ff69b4, 0 0 60px #f0f; }
+    50% { color: #fff; text-shadow: 0 0 20px #0ff, 0 0 40px #0f0, 0 0 60px #0ff; }
+    75% { color: #ff69b4; text-shadow: 0 0 20px #ff0, 0 0 40px #ff6600, 0 0 60px #ff0; }
+    100% { color: #7fff00; text-shadow: 0 0 20px #f00, 0 0 40px #ff0, 0 0 60px #f00; }
+  }
+
+  @keyframes fireworksScale {
+    0% { transform: scale(1); }
+    100% { transform: scale(1.08); }
+  }
+
+  @keyframes fireworksTextPulse {
+    0% { opacity: 0.85; }
+    100% { opacity: 1; }
+  }
+
+  @keyframes fireworksFadeIn {
+    0% { opacity: 0; transform: translateY(20px); }
+    100% { opacity: 0.9; transform: translateY(0); }
+  }
 }
