@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { Header } from "@/components/Header";
 import { TeamManager } from "@/components/TeamManager";
 import { IncomingOrders } from "@/components/IncomingOrders";
+import { NotificationsPage } from "@/components/NotificationsPage";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
