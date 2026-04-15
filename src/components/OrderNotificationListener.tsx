@@ -14,14 +14,13 @@ interface OrderNotification {
 export function OrderNotificationListener() {
   const { user } = useAuth();
   const { toast } = useToast();
-  const [activeNotification, setActiveNotification] = useState<OrderNotification | null>(null);
+  const [showFireworks, setShowFireworks] = useState(false);
 
   useEffect(() => {
     if (!user) return;
 
-    // Listen for new order_notifications in realtime
     const channel = supabase
-      .channel('order-notifications')
+      .channel('order-notifications-global')
       .on(
         'postgres_changes',
         {
@@ -32,10 +31,11 @@ export function OrderNotificationListener() {
         },
         (payload) => {
           const notif = payload.new as OrderNotification;
-          setActiveNotification(notif);
+          setShowFireworks(true);
           toast({
-            title: "🎉 Yeni Sipariş Geldi!",
-            description: `${notif.sender_name} yeni sipariş gönderdi - PO: ${notif.po_number} - ${notif.model_name}`,
+            title: "🎉🎆 Yeni Sipariş Geldi!",
+            description: `${notif.sender_name || "Buyer"} yeni sipariş gönderdi!\nPO: ${notif.po_number} - ${notif.model_name}`,
+            duration: 8000,
           });
         }
       )
@@ -46,9 +46,7 @@ export function OrderNotificationListener() {
     };
   }, [user, toast]);
 
-  if (!activeNotification) return null;
+  if (!showFireworks) return null;
 
-  return (
-    <Fireworks onComplete={() => setActiveNotification(null)} />
-  );
+  return <Fireworks onComplete={() => setShowFireworks(false)} />;
 }
