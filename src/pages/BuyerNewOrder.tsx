@@ -341,11 +341,11 @@ export default function BuyerNewOrder() {
 
         // Create notifications for all recipients
         const notifications = recipientIds.map(rid => ({
-          order_id: orderData.id,
+          order_id: savedOrderId,
           recipient_id: rid,
           sender_id: user!.id,
           sender_name: senderName,
-          po_number: poNumber,
+          po_number: savedPoNumber,
           model_name: modelName,
         }));
 
@@ -355,8 +355,8 @@ export default function BuyerNewOrder() {
       toast({
         title: "Başarılı",
         description: sendToTedarik 
-          ? `Sipariş oluşturuldu ve tedarik sorumlusuna gönderildi (PO: ${poNumber})`
-          : `Sipariş taslak olarak kaydedildi (PO: ${poNumber})`,
+          ? `Sipariş ${isEditMode ? 'güncellendi' : 'oluşturuldu'} ve tedarik sorumlusuna gönderildi (PO: ${savedPoNumber})`
+          : `Sipariş ${isEditMode ? 'güncellendi' : 'taslak olarak kaydedildi'} (PO: ${savedPoNumber})`,
       });
 
       navigate("/buyer");
