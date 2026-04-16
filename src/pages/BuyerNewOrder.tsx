@@ -382,7 +382,7 @@ export default function BuyerNewOrder() {
             <ArrowLeft className="h-5 w-5" />
           </Button>
           <div>
-            <h1 className="text-xl font-bold">Yeni Sipariş Oluştur</h1>
+            <h1 className="text-xl font-bold">{isEditMode ? "Siparişi Düzenle" : "Yeni Sipariş Oluştur"}</h1>
             <p className="text-sm text-muted-foreground">LC Waikiki formatında sipariş girişi</p>
           </div>
         </div>
