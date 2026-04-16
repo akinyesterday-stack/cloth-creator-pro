@@ -41,9 +41,11 @@ const ASORTI_DEFAULTS = { "0m-1m": 1, "1m-3m": 3, "3m-6m": 3, "6m-9m": 1 };
 
 export default function BuyerNewOrder() {
   const navigate = useNavigate();
+  const { orderId } = useParams<{ orderId?: string }>();
   const { user } = useAuth();
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isEditMode, setIsEditMode] = useState(false);
 
   const [loading, setLoading] = useState(false);
   const [tedarikSorumlulari, setTedarikSorumlulari] = useState<TedarikSorumlusu[]>([]);
