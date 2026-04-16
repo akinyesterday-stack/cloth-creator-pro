@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -41,9 +41,11 @@ const ASORTI_DEFAULTS = { "0m-1m": 1, "1m-3m": 3, "3m-6m": 3, "6m-9m": 1 };
 
 export default function BuyerNewOrder() {
   const navigate = useNavigate();
+  const { orderId } = useParams<{ orderId?: string }>();
   const { user } = useAuth();
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isEditMode, setIsEditMode] = useState(false);
 
   const [loading, setLoading] = useState(false);
   const [tedarikSorumlulari, setTedarikSorumlulari] = useState<TedarikSorumlusu[]>([]);
@@ -83,6 +85,66 @@ export default function BuyerNewOrder() {
     };
     fetchTedarikSorumlulari();
   }, []);
+
+  // Load existing order for editing
+  useEffect(() => {
+    if (!orderId) return;
+    setIsEditMode(true);
+    const loadOrder = async () => {
+      setLoading(true);
+      const { data: order } = await supabase
+        .from("buyer_orders")
+        .select("*")
+        .eq("id", orderId)
+        .single();
+
+      if (order) {
+        setModelName(order.model_name || "");
+        setModelImage(order.model_image || null);
+        setBrand(order.brand || "LC WAIKIKI");
+        setSeason(order.season || "");
+        setMalTanimi(order.mal_tanimi || "");
+        setMerchAltGrup(order.merch_alt_grup || "");
+        setYiInspectionDate(order.yi_inspection_date || "");
+        setYdInspectionDate(order.yd_inspection_date || "");
+        setTeslimYeri(order.teslim_yeri || "LCWaikiki Depoları");
+        setUnitPrice(order.unit_price || 0);
+        setKdvRate(order.kdv_rate || 10);
+        setFabricPrice(order.fabric_price || 0);
+        setOptionPrice(order.option_price || "");
+        setProfitMargin(order.profit_margin || 15);
+        setAssignedTo(order.assigned_to || "");
+      }
+
+      const { data: orderItems } = await supabase
+        .from("buyer_order_items")
+        .select("*")
+        .eq("order_id", orderId);
+
+      if (orderItems && orderItems.length > 0) {
+        setItems(orderItems.map(item => ({
+          id: item.id,
+          jit: item.jit || false,
+          satis_bolgesi: item.satis_bolgesi || "Yurt İçi",
+          model: item.model || "",
+          option_name: item.option_name || "",
+          inspection_date: item.inspection_date || "",
+          size_0m_1m: item.size_0m_1m || 0,
+          size_1m_3m: item.size_1m_3m || 0,
+          size_3m_6m: item.size_3m_6m || 0,
+          size_6m_9m: item.size_6m_9m || 0,
+          asorti_0m_1m: item.asorti_0m_1m || 0,
+          asorti_1m_3m: item.asorti_1m_3m || 0,
+          asorti_3m_6m: item.asorti_3m_6m || 0,
+          asorti_6m_9m: item.asorti_6m_9m || 0,
+          asorti_count: item.asorti_count || 0,
+          total_quantity: item.total_quantity || 0,
+        })));
+      }
+      setLoading(false);
+    };
+    loadOrder();
+  }, [orderId]);
 
   // Generate 7-digit PO number
   const generatePoNumber = () => {
@@ -167,45 +229,70 @@ export default function BuyerNewOrder() {
     setLoading(true);
 
     try {
-      const poNumber = generatePoNumber();
+      const poNumber = isEditMode ? undefined : generatePoNumber();
+      const orderPayload = {
+        model_name: modelName,
+        model_image: modelImage,
+        brand,
+        season,
+        mal_tanimi: malTanimi,
+        merch_alt_grup: merchAltGrup,
+        yi_inspection_date: yiInspectionDate || null,
+        yd_inspection_date: ydInspectionDate || null,
+        teslim_yeri: teslimYeri,
+        total_quantity: totalQuantity,
+        unit_price: unitPrice,
+        total_amount: totalAmount,
+        kdv_rate: kdvRate,
+        kdv_amount: kdvAmount,
+        total_with_kdv: totalWithKdv,
+        profit_margin: profitMargin,
+        profit_amount: profitAmount,
+        fabric_price: fabricPrice,
+        option_price: optionPrice,
+        assigned_to: sendToTedarik ? assignedTo : null,
+        status: sendToTedarik ? "sent" : "draft",
+      };
 
-      // Create order
-      const { data: orderData, error: orderError } = await supabase
-        .from("buyer_orders")
-        .insert({
-          user_id: user?.id,
-          po_number: poNumber,
-          model_name: modelName,
-          model_image: modelImage,
-          brand,
-          season,
-          mal_tanimi: malTanimi,
-          merch_alt_grup: merchAltGrup,
-          yi_inspection_date: yiInspectionDate || null,
-          yd_inspection_date: ydInspectionDate || null,
-          teslim_yeri: teslimYeri,
-          total_quantity: totalQuantity,
-          unit_price: unitPrice,
-          total_amount: totalAmount,
-          kdv_rate: kdvRate,
-          kdv_amount: kdvAmount,
-          total_with_kdv: totalWithKdv,
-          profit_margin: profitMargin,
-          profit_amount: profitAmount,
-          fabric_price: fabricPrice,
-          option_price: optionPrice,
-          assigned_to: sendToTedarik ? assignedTo : null,
-          status: sendToTedarik ? "sent" : "draft",
-        })
-        .select()
-        .single();
+      let savedOrderId: string;
+      let savedPoNumber: string;
 
-      if (orderError) throw orderError;
+      if (isEditMode && orderId) {
+        // Update existing order
+        const { data: orderData, error: orderError } = await supabase
+          .from("buyer_orders")
+          .update(orderPayload)
+          .eq("id", orderId)
+          .select()
+          .single();
 
-      // Create order items
-      if (orderData && items.length > 0) {
+        if (orderError) throw orderError;
+        savedOrderId = orderData.id;
+        savedPoNumber = orderData.po_number;
+
+        // Delete old items and re-insert
+        await supabase.from("buyer_order_items").delete().eq("order_id", orderId);
+      } else {
+        // Create new order
+        const { data: orderData, error: orderError } = await supabase
+          .from("buyer_orders")
+          .insert({
+            ...orderPayload,
+            user_id: user?.id,
+            po_number: poNumber!,
+          })
+          .select()
+          .single();
+
+        if (orderError) throw orderError;
+        savedOrderId = orderData.id;
+        savedPoNumber = orderData.po_number;
+      }
+
+      // Insert order items
+      if (items.length > 0) {
         const orderItems = items.map(item => ({
-          order_id: orderData.id,
+          order_id: savedOrderId,
           jit: item.jit,
           satis_bolgesi: item.satis_bolgesi,
           model: item.model,
@@ -231,7 +318,7 @@ export default function BuyerNewOrder() {
       }
 
       // Send notifications to tedarik sorumlusu and their team
-      if (sendToTedarik && orderData) {
+      if (sendToTedarik) {
         const senderProfile = await supabase
           .from("profiles")
           .select("full_name")
@@ -254,11 +341,11 @@ export default function BuyerNewOrder() {
 
         // Create notifications for all recipients
         const notifications = recipientIds.map(rid => ({
-          order_id: orderData.id,
+          order_id: savedOrderId,
           recipient_id: rid,
           sender_id: user!.id,
           sender_name: senderName,
-          po_number: poNumber,
+          po_number: savedPoNumber,
           model_name: modelName,
         }));
 
@@ -268,8 +355,8 @@ export default function BuyerNewOrder() {
       toast({
         title: "Başarılı",
         description: sendToTedarik 
-          ? `Sipariş oluşturuldu ve tedarik sorumlusuna gönderildi (PO: ${poNumber})`
-          : `Sipariş taslak olarak kaydedildi (PO: ${poNumber})`,
+          ? `Sipariş ${isEditMode ? 'güncellendi' : 'oluşturuldu'} ve tedarik sorumlusuna gönderildi (PO: ${savedPoNumber})`
+          : `Sipariş ${isEditMode ? 'güncellendi' : 'taslak olarak kaydedildi'} (PO: ${savedPoNumber})`,
       });
 
       navigate("/buyer");
@@ -295,7 +382,7 @@ export default function BuyerNewOrder() {
             <ArrowLeft className="h-5 w-5" />
           </Button>
           <div>
-            <h1 className="text-xl font-bold">Yeni Sipariş Oluştur</h1>
+            <h1 className="text-xl font-bold">{isEditMode ? "Siparişi Düzenle" : "Yeni Sipariş Oluştur"}</h1>
             <p className="text-sm text-muted-foreground">LC Waikiki formatında sipariş girişi</p>
           </div>
         </div>
