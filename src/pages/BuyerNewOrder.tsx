@@ -86,6 +86,66 @@ export default function BuyerNewOrder() {
     fetchTedarikSorumlulari();
   }, []);
 
+  // Load existing order for editing
+  useEffect(() => {
+    if (!orderId) return;
+    setIsEditMode(true);
+    const loadOrder = async () => {
+      setLoading(true);
+      const { data: order } = await supabase
+        .from("buyer_orders")
+        .select("*")
+        .eq("id", orderId)
+        .single();
+
+      if (order) {
+        setModelName(order.model_name || "");
+        setModelImage(order.model_image || null);
+        setBrand(order.brand || "LC WAIKIKI");
+        setSeason(order.season || "");
+        setMalTanimi(order.mal_tanimi || "");
+        setMerchAltGrup(order.merch_alt_grup || "");
+        setYiInspectionDate(order.yi_inspection_date || "");
+        setYdInspectionDate(order.yd_inspection_date || "");
+        setTeslimYeri(order.teslim_yeri || "LCWaikiki Depoları");
+        setUnitPrice(order.unit_price || 0);
+        setKdvRate(order.kdv_rate || 10);
+        setFabricPrice(order.fabric_price || 0);
+        setOptionPrice(order.option_price || "");
+        setProfitMargin(order.profit_margin || 15);
+        setAssignedTo(order.assigned_to || "");
+      }
+
+      const { data: orderItems } = await supabase
+        .from("buyer_order_items")
+        .select("*")
+        .eq("order_id", orderId);
+
+      if (orderItems && orderItems.length > 0) {
+        setItems(orderItems.map(item => ({
+          id: item.id,
+          jit: item.jit || false,
+          satis_bolgesi: item.satis_bolgesi || "Yurt İçi",
+          model: item.model || "",
+          option_name: item.option_name || "",
+          inspection_date: item.inspection_date || "",
+          size_0m_1m: item.size_0m_1m || 0,
+          size_1m_3m: item.size_1m_3m || 0,
+          size_3m_6m: item.size_3m_6m || 0,
+          size_6m_9m: item.size_6m_9m || 0,
+          asorti_0m_1m: item.asorti_0m_1m || 0,
+          asorti_1m_3m: item.asorti_1m_3m || 0,
+          asorti_3m_6m: item.asorti_3m_6m || 0,
+          asorti_6m_9m: item.asorti_6m_9m || 0,
+          asorti_count: item.asorti_count || 0,
+          total_quantity: item.total_quantity || 0,
+        })));
+      }
+      setLoading(false);
+    };
+    loadOrder();
+  }, [orderId]);
+
   // Generate 7-digit PO number
   const generatePoNumber = () => {
     return Math.floor(1000000 + Math.random() * 9000000).toString();
