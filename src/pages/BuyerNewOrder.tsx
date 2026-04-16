@@ -229,45 +229,70 @@ export default function BuyerNewOrder() {
     setLoading(true);
 
     try {
-      const poNumber = generatePoNumber();
+      const poNumber = isEditMode ? undefined : generatePoNumber();
+      const orderPayload = {
+        model_name: modelName,
+        model_image: modelImage,
+        brand,
+        season,
+        mal_tanimi: malTanimi,
+        merch_alt_grup: merchAltGrup,
+        yi_inspection_date: yiInspectionDate || null,
+        yd_inspection_date: ydInspectionDate || null,
+        teslim_yeri: teslimYeri,
+        total_quantity: totalQuantity,
+        unit_price: unitPrice,
+        total_amount: totalAmount,
+        kdv_rate: kdvRate,
+        kdv_amount: kdvAmount,
+        total_with_kdv: totalWithKdv,
+        profit_margin: profitMargin,
+        profit_amount: profitAmount,
+        fabric_price: fabricPrice,
+        option_price: optionPrice,
+        assigned_to: sendToTedarik ? assignedTo : null,
+        status: sendToTedarik ? "sent" : "draft",
+      };
 
-      // Create order
-      const { data: orderData, error: orderError } = await supabase
-        .from("buyer_orders")
-        .insert({
-          user_id: user?.id,
-          po_number: poNumber,
-          model_name: modelName,
-          model_image: modelImage,
-          brand,
-          season,
-          mal_tanimi: malTanimi,
-          merch_alt_grup: merchAltGrup,
-          yi_inspection_date: yiInspectionDate || null,
-          yd_inspection_date: ydInspectionDate || null,
-          teslim_yeri: teslimYeri,
-          total_quantity: totalQuantity,
-          unit_price: unitPrice,
-          total_amount: totalAmount,
-          kdv_rate: kdvRate,
-          kdv_amount: kdvAmount,
-          total_with_kdv: totalWithKdv,
-          profit_margin: profitMargin,
-          profit_amount: profitAmount,
-          fabric_price: fabricPrice,
-          option_price: optionPrice,
-          assigned_to: sendToTedarik ? assignedTo : null,
-          status: sendToTedarik ? "sent" : "draft",
-        })
-        .select()
-        .single();
+      let savedOrderId: string;
+      let savedPoNumber: string;
 
-      if (orderError) throw orderError;
+      if (isEditMode && orderId) {
+        // Update existing order
+        const { data: orderData, error: orderError } = await supabase
+          .from("buyer_orders")
+          .update(orderPayload)
+          .eq("id", orderId)
+          .select()
+          .single();
 
-      // Create order items
-      if (orderData && items.length > 0) {
+        if (orderError) throw orderError;
+        savedOrderId = orderData.id;
+        savedPoNumber = orderData.po_number;
+
+        // Delete old items and re-insert
+        await supabase.from("buyer_order_items").delete().eq("order_id", orderId);
+      } else {
+        // Create new order
+        const { data: orderData, error: orderError } = await supabase
+          .from("buyer_orders")
+          .insert({
+            ...orderPayload,
+            user_id: user?.id,
+            po_number: poNumber!,
+          })
+          .select()
+          .single();
+
+        if (orderError) throw orderError;
+        savedOrderId = orderData.id;
+        savedPoNumber = orderData.po_number;
+      }
+
+      // Insert order items
+      if (items.length > 0) {
         const orderItems = items.map(item => ({
-          order_id: orderData.id,
+          order_id: savedOrderId,
           jit: item.jit,
           satis_bolgesi: item.satis_bolgesi,
           model: item.model,
@@ -293,7 +318,7 @@ export default function BuyerNewOrder() {
       }
 
       // Send notifications to tedarik sorumlusu and their team
-      if (sendToTedarik && orderData) {
+      if (sendToTedarik) {
         const senderProfile = await supabase
           .from("profiles")
           .select("full_name")
