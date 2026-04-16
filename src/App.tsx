@@ -155,6 +155,14 @@ function AppRoutes() {
           </BuyerRoute>
         }
       />
+      <Route
+        path="/buyer/order/:orderId"
+        element={
+          <BuyerRoute>
+            <BuyerNewOrder />
+          </BuyerRoute>
+        }
+      />
       <Route path="*" element={<NotFound />} />
     </Routes>
   );
