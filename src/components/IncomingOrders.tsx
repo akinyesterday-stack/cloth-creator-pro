@@ -74,7 +74,7 @@ export function IncomingOrders() {
         .channel("incoming-orders")
         .on(
           "postgres_changes",
-          { event: "INSERT", schema: "public", table: "buyer_orders", filter: `assigned_to=eq.${user.id}` },
+          { event: "INSERT", schema: "public", table: "buyer_orders" },
           () => fetchOrders()
         )
         .subscribe();
@@ -85,10 +85,20 @@ export function IncomingOrders() {
 
   const fetchOrders = async () => {
     setLoading(true);
+    const { data: memberships } = await supabase
+      .from("team_members")
+      .select("team_leader_id")
+      .eq("member_id", user!.id);
+
+    const assignedUserIds = [
+      user!.id,
+      ...new Set((memberships || []).map((membership) => membership.team_leader_id)),
+    ];
+
     const { data } = await supabase
       .from("buyer_orders")
       .select("*")
-      .eq("assigned_to", user!.id)
+      .in("assigned_to", assignedUserIds)
       .order("created_at", { ascending: false });
 
     setOrders(data || []);
