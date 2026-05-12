@@ -820,12 +820,6 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      get_team_member_ids: {
-        Args: { _leader_id: string }
-        Returns: {
-          member_id: string
-        }[]
-      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
