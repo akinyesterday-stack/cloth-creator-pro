@@ -317,42 +317,7 @@ export default function BuyerNewOrder() {
         if (itemsError) throw itemsError;
       }
 
-      // Send notifications to tedarik sorumlusu and their team
-      if (sendToTedarik) {
-        const senderProfile = await supabase
-          .from("profiles")
-          .select("full_name")
-          .eq("user_id", user!.id)
-          .single();
-
-        const senderName = senderProfile.data?.full_name || "Buyer";
-
-        // Get team members of the assigned tedarik sorumlusu via SECURITY DEFINER RPC
-        // (RLS on team_members blocks buyers from selecting directly)
-        const { data: teamMembers } = await supabase
-          .rpc("get_team_member_ids", { _leader_id: assignedTo });
-
-        // Collect all recipient IDs (tedarik sorumlusu + team), de-duplicated
-        const recipientSet = new Set<string>([assignedTo]);
-        if (teamMembers) {
-          for (const tm of teamMembers as { member_id: string }[]) {
-            if (tm.member_id) recipientSet.add(tm.member_id);
-          }
-        }
-        const recipientIds = Array.from(recipientSet);
-
-        // Create notifications for all recipients
-        const notifications = recipientIds.map(rid => ({
-          order_id: savedOrderId,
-          recipient_id: rid,
-          sender_id: user!.id,
-          sender_name: senderName,
-          po_number: savedPoNumber,
-          model_name: modelName,
-        }));
-
-        await supabase.from("order_notifications").insert(notifications);
-      }
+      // Bildirimler backend tarafından tedarik sorumlusu ve ekibine otomatik oluşturulur.
 
       toast({
         title: "Başarılı",
