@@ -327,17 +327,19 @@ export default function BuyerNewOrder() {
 
         const senderName = senderProfile.data?.full_name || "Buyer";
 
-        // Get team members of the assigned tedarik sorumlusu
+        // Get team members of the assigned tedarik sorumlusu via SECURITY DEFINER RPC
+        // (RLS on team_members blocks buyers from selecting directly)
         const { data: teamMembers } = await supabase
-          .from("team_members")
-          .select("member_id")
-          .eq("team_leader_id", assignedTo);
+          .rpc("get_team_member_ids", { _leader_id: assignedTo });
 
-        // Collect all recipient IDs (tedarik sorumlusu + team)
-        const recipientIds = [assignedTo];
+        // Collect all recipient IDs (tedarik sorumlusu + team), de-duplicated
+        const recipientSet = new Set<string>([assignedTo]);
         if (teamMembers) {
-          recipientIds.push(...teamMembers.map(tm => tm.member_id));
+          for (const tm of teamMembers as { member_id: string }[]) {
+            if (tm.member_id) recipientSet.add(tm.member_id);
+          }
         }
+        const recipientIds = Array.from(recipientSet);
 
         // Create notifications for all recipients
         const notifications = recipientIds.map(rid => ({
