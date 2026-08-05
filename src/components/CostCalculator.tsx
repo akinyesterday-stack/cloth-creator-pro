@@ -23,6 +23,7 @@ import ExcelJS from "exceljs";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { SavedCostsPreview } from "@/components/SavedCostsPreview";
 
 interface FabricPrice {
   fabric_name: string;
@@ -1006,6 +1007,11 @@ export const CostCalculator = forwardRef<HTMLDivElement, CostCalculatorProps>(fu
               onUsageAreasChange={handleUsageAreasChange}
             />
           )}
+
+          {/* Saved Costs (with images) */}
+          <SavedCostsPreview />
+
+
 
       {/* Model Creation */}
       <Card className="border-none shadow-2xl overflow-hidden bg-gradient-to-br from-card via-card to-secondary/20">
