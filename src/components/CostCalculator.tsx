@@ -23,6 +23,7 @@ import ExcelJS from "exceljs";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { SavedCostsPreview } from "@/components/SavedCostsPreview";
 
 interface FabricPrice {
   fabric_name: string;
