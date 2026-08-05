@@ -1007,6 +1007,11 @@ export const CostCalculator = forwardRef<HTMLDivElement, CostCalculatorProps>(fu
             />
           )}
 
+          {/* Saved Costs (with images) */}
+          <SavedCostsPreview />
+
+
+
       {/* Model Creation */}
       <Card className="border-none shadow-2xl overflow-hidden bg-gradient-to-br from-card via-card to-secondary/20">
         <CardHeader className="gradient-primary rounded-t-lg relative overflow-hidden">
