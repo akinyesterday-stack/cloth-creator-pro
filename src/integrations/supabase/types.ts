@@ -14,6 +14,30 @@ export type Database = {
   }
   public: {
     Tables: {
+      approval_settings: {
+        Row: {
+          created_at: string
+          id: string
+          limit_amount: number
+          manager_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          limit_amount?: number
+          manager_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          limit_amount?: number
+          manager_id?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       buyer_order_countries: {
         Row: {
           ana_beden: number | null
@@ -364,6 +388,27 @@ export type Database = {
         }
         Relationships: []
       }
+      manager_assignments: {
+        Row: {
+          created_at: string
+          id: string
+          manager_id: string
+          sorumlu_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          manager_id: string
+          sorumlu_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          manager_id?: string
+          sorumlu_id?: string
+        }
+        Relationships: []
+      }
       notifications: {
         Row: {
           created_at: string
@@ -553,6 +598,156 @@ export type Database = {
           username?: string
         }
         Relationships: []
+      }
+      sas_approvals: {
+        Row: {
+          action: string
+          approver_id: string
+          approver_role: string
+          created_at: string
+          id: string
+          note: string | null
+          sas_id: string
+        }
+        Insert: {
+          action: string
+          approver_id: string
+          approver_role: string
+          created_at?: string
+          id?: string
+          note?: string | null
+          sas_id: string
+        }
+        Update: {
+          action?: string
+          approver_id?: string
+          approver_role?: string
+          created_at?: string
+          id?: string
+          note?: string | null
+          sas_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sas_approvals_sas_id_fkey"
+            columns: ["sas_id"]
+            isOneToOne: false
+            referencedRelation: "sas_forms"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      sas_forms: {
+        Row: {
+          created_at: string
+          created_by: string
+          id: string
+          plm_error: string | null
+          plm_fetched_at: string | null
+          status: string
+          team_leader_id: string
+          total_amount: number
+          updated_at: string
+          work_order_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by: string
+          id?: string
+          plm_error?: string | null
+          plm_fetched_at?: string | null
+          status?: string
+          team_leader_id: string
+          total_amount?: number
+          updated_at?: string
+          work_order_id: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          id?: string
+          plm_error?: string | null
+          plm_fetched_at?: string | null
+          status?: string
+          team_leader_id?: string
+          total_amount?: number
+          updated_at?: string
+          work_order_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sas_forms_work_order_id_fkey"
+            columns: ["work_order_id"]
+            isOneToOne: true
+            referencedRelation: "work_orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      sas_items: {
+        Row: {
+          color: string | null
+          created_at: string
+          fabric_code: string
+          fabric_name: string | null
+          gramaj: number | null
+          id: string
+          line_total: number | null
+          order_quantity: number
+          quantity: number | null
+          sas_id: string
+          source: string
+          supplier: string | null
+          termin_date: string | null
+          unit: string
+          unit_price: number | null
+          updated_at: string
+        }
+        Insert: {
+          color?: string | null
+          created_at?: string
+          fabric_code: string
+          fabric_name?: string | null
+          gramaj?: number | null
+          id?: string
+          line_total?: number | null
+          order_quantity?: number
+          quantity?: number | null
+          sas_id: string
+          source?: string
+          supplier?: string | null
+          termin_date?: string | null
+          unit?: string
+          unit_price?: number | null
+          updated_at?: string
+        }
+        Update: {
+          color?: string | null
+          created_at?: string
+          fabric_code?: string
+          fabric_name?: string | null
+          gramaj?: number | null
+          id?: string
+          line_total?: number | null
+          order_quantity?: number
+          quantity?: number | null
+          sas_id?: string
+          source?: string
+          supplier?: string | null
+          termin_date?: string | null
+          unit?: string
+          unit_price?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sas_items_sas_id_fkey"
+            columns: ["sas_id"]
+            isOneToOne: false
+            referencedRelation: "sas_forms"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       saved_costs: {
         Row: {
@@ -815,11 +1010,54 @@ export type Database = {
         }
         Relationships: []
       }
+      work_orders: {
+        Row: {
+          created_at: string
+          id: string
+          notes: string | null
+          opened_by: string
+          order_id: string
+          status: string
+          team_leader_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          notes?: string | null
+          opened_by: string
+          order_id: string
+          status?: string
+          team_leader_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          notes?: string | null
+          opened_by?: string
+          order_id?: string
+          status?: string
+          team_leader_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "work_orders_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: true
+            referencedRelation: "buyer_orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
+      can_access_sas: { Args: { _sas_id: string }; Returns: boolean }
+      can_access_team: { Args: { _leader: string }; Returns: boolean }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -828,6 +1066,11 @@ export type Database = {
         Returns: boolean
       }
       is_approved: { Args: { _user_id: string }; Returns: boolean }
+      is_manager_of: {
+        Args: { _manager: string; _sorumlu: string }
+        Returns: boolean
+      }
+      my_team_leaders: { Args: never; Returns: string[] }
     }
     Enums: {
       app_role: "admin" | "user"
