@@ -26,6 +26,7 @@ const TEAM_ROLES = [
   { value: "fabric", label: "Kumaş" },
   { value: "planlama", label: "Planlama" },
   { value: "fason", label: "Fason" },
+  { value: "kesim_takip", label: "Kesim Takip" },
 ];
 
 export function TeamManager() {
@@ -57,7 +58,7 @@ export function TeamManager() {
       const { data: usersData } = await supabase
         .from("profiles")
         .select("id, user_id, full_name, user_type")
-        .in("user_type", ["fabric", "planlama", "fason"])
+        .in("user_type", ["fabric", "planlama", "fason", "kesim_takip"])
         .eq("status", "approved");
 
       if (teamData && usersData) {
