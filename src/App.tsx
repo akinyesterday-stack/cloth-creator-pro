@@ -15,6 +15,9 @@ import NotFound from "./pages/NotFound";
 import BuyerDashboard from "./pages/BuyerDashboard";
 import BuyerNewOrder from "./pages/BuyerNewOrder";
 import TedarikDashboard from "./pages/TedarikDashboard";
+import TeamWorkspace from "./pages/TeamWorkspace";
+import MudurDashboard from "./pages/MudurDashboard";
+import SasDetail from "./pages/SasDetail";
 import { Loader2 } from "lucide-react";
 import { OrderNotificationListener } from "@/components/OrderNotificationListener";
 
@@ -47,6 +50,22 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   // Redirect tedarik_sorumlusu to their dashboard
   if (userType === "tedarik_sorumlusu" && window.location.pathname === "/") {
     return <Navigate to="/tedarik" replace />;
+  }
+
+  // Redirect team specialists to the shared team workspace
+  if (
+    ["planlama", "fabric", "kesim_takip", "fason"].includes(userType) &&
+    window.location.pathname === "/"
+  ) {
+    return <Navigate to="/planlama" replace />;
+  }
+
+  // Redirect managers to their panel
+  if (
+    ["tedarik_muduru", "isletme_muduru"].includes(userType) &&
+    window.location.pathname === "/"
+  ) {
+    return <Navigate to="/mudur" replace />;
   }
 
   return <>{children}</>;
