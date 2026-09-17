@@ -2,13 +2,15 @@ import { useState, useEffect } from "react";
 import { Header } from "@/components/Header";
 import { TeamManager } from "@/components/TeamManager";
 import { IncomingOrders } from "@/components/IncomingOrders";
+import { WorkOrderList } from "@/components/WorkOrderList";
+import { TeamReport } from "@/components/TeamReport";
 import { NotificationsPage } from "@/components/NotificationsPage";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
-import { Users, Activity, ClipboardList, Bell, Loader2 } from "lucide-react";
+import { Users, Activity, ClipboardList, Bell, Loader2, Factory, BarChart3 } from "lucide-react";
 import { format } from "date-fns";
 import { tr } from "date-fns/locale";
 
@@ -181,6 +183,12 @@ const TedarikDashboard = () => {
             <TabsTrigger value="orders" className="gap-2">
               <ClipboardList className="h-4 w-4" /> Gelen Siparişler
             </TabsTrigger>
+            <TabsTrigger value="workorders" className="gap-2">
+              <Factory className="h-4 w-4" /> İş Emirleri / SAS
+            </TabsTrigger>
+            <TabsTrigger value="report" className="gap-2">
+              <BarChart3 className="h-4 w-4" /> Ekip Raporu
+            </TabsTrigger>
             <TabsTrigger value="activity" className="gap-2">
               <Activity className="h-4 w-4" /> Aktiviteler
             </TabsTrigger>
@@ -221,6 +229,14 @@ const TedarikDashboard = () => {
 
           <TabsContent value="notifications">
             <NotificationsPage />
+          </TabsContent>
+
+          <TabsContent value="workorders">
+            <WorkOrderList />
+          </TabsContent>
+
+          <TabsContent value="report">
+            <TeamReport />
           </TabsContent>
 
           <TabsContent value="orders">
