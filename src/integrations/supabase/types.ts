@@ -639,11 +639,14 @@ export type Database = {
       }
       sas_forms: {
         Row: {
+          cost_opened_at: string | null
+          cost_opened_by: string | null
           created_at: string
           created_by: string
           id: string
           plm_error: string | null
           plm_fetched_at: string | null
+          revision: number
           status: string
           team_leader_id: string
           total_amount: number
@@ -651,11 +654,14 @@ export type Database = {
           work_order_id: string
         }
         Insert: {
+          cost_opened_at?: string | null
+          cost_opened_by?: string | null
           created_at?: string
           created_by: string
           id?: string
           plm_error?: string | null
           plm_fetched_at?: string | null
+          revision?: number
           status?: string
           team_leader_id: string
           total_amount?: number
@@ -663,11 +669,14 @@ export type Database = {
           work_order_id: string
         }
         Update: {
+          cost_opened_at?: string | null
+          cost_opened_by?: string | null
           created_at?: string
           created_by?: string
           id?: string
           plm_error?: string | null
           plm_fetched_at?: string | null
+          revision?: number
           status?: string
           team_leader_id?: string
           total_amount?: number
@@ -687,10 +696,14 @@ export type Database = {
       sas_items: {
         Row: {
           color: string | null
+          composition: string | null
           created_at: string
+          dye_price: number | null
+          dyehouse: string | null
           fabric_code: string
           fabric_name: string | null
           gramaj: number | null
+          gsm_m2: number | null
           id: string
           line_total: number | null
           order_quantity: number
@@ -702,13 +715,18 @@ export type Database = {
           unit: string
           unit_price: number | null
           updated_at: string
+          width_cm: number | null
         }
         Insert: {
           color?: string | null
+          composition?: string | null
           created_at?: string
+          dye_price?: number | null
+          dyehouse?: string | null
           fabric_code: string
           fabric_name?: string | null
           gramaj?: number | null
+          gsm_m2?: number | null
           id?: string
           line_total?: number | null
           order_quantity?: number
@@ -720,13 +738,18 @@ export type Database = {
           unit?: string
           unit_price?: number | null
           updated_at?: string
+          width_cm?: number | null
         }
         Update: {
           color?: string | null
+          composition?: string | null
           created_at?: string
+          dye_price?: number | null
+          dyehouse?: string | null
           fabric_code?: string
           fabric_name?: string | null
           gramaj?: number | null
+          gsm_m2?: number | null
           id?: string
           line_total?: number | null
           order_quantity?: number
@@ -738,6 +761,7 @@ export type Database = {
           unit?: string
           unit_price?: number | null
           updated_at?: string
+          width_cm?: number | null
         }
         Relationships: [
           {
