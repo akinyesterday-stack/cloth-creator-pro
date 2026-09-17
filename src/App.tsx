@@ -182,6 +182,30 @@ function AppRoutes() {
           </BuyerRoute>
         }
       />
+      <Route
+        path="/planlama"
+        element={
+          <ProtectedRoute>
+            <TeamWorkspace />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/mudur"
+        element={
+          <ProtectedRoute>
+            <MudurDashboard />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/sas/:workOrderId"
+        element={
+          <ProtectedRoute>
+            <SasDetail />
+          </ProtectedRoute>
+        }
+      />
       <Route path="*" element={<NotFound />} />
     </Routes>
   );
