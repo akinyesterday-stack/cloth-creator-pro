@@ -2,8 +2,8 @@ import { supabase } from "@/integrations/supabase/client";
 
 export type SasStatus =
   | "draft"
-  | "gramaj_pending"
   | "fabric_pending"
+  | "gramaj_pending"
   | "sorumlu_approval"
   | "mudur_approval"
   | "approved"
@@ -11,12 +11,23 @@ export type SasStatus =
 
 export const SAS_STATUS: Record<string, { label: string; className: string }> = {
   draft: { label: "Kumaş Kodu Bekleniyor", className: "bg-muted text-muted-foreground border-border" },
-  gramaj_pending: { label: "Pastal Gramajı Bekleniyor", className: "bg-amber-500/20 text-amber-600 border-amber-500/30" },
   fabric_pending: { label: "Kumaş Sorumlusunda", className: "bg-blue-500/20 text-blue-600 border-blue-500/30" },
+  gramaj_pending: { label: "Kesim Takipte (Pastal)", className: "bg-amber-500/20 text-amber-600 border-amber-500/30" },
   sorumlu_approval: { label: "Tedarik Sorumlusu Onayında", className: "bg-purple-500/20 text-purple-600 border-purple-500/30" },
   mudur_approval: { label: "Tedarik Müdürü Onayında", className: "bg-orange-500/20 text-orange-600 border-orange-500/30" },
   approved: { label: "Onaylandı", className: "bg-green-500/20 text-green-600 border-green-500/30" },
   rejected: { label: "Reddedildi", className: "bg-destructive/20 text-destructive border-destructive/30" },
+};
+
+/** Who the file is currently waiting on. */
+export const WAITING_ON: Record<string, string> = {
+  draft: "Planlama (kumaş kodu)",
+  fabric_pending: "Kumaş Sorumlusu",
+  gramaj_pending: "Kesim Takip Uzmanı",
+  sorumlu_approval: "Tedarik Sorumlusu",
+  mudur_approval: "Tedarik Müdürü",
+  approved: "—",
+  rejected: "Kumaş Sorumlusu",
 };
 
 export interface SasItem {
@@ -26,6 +37,11 @@ export interface SasItem {
   fabric_name: string | null;
   color: string | null;
   unit: string;
+  composition: string | null;
+  width_cm: number | null;
+  gsm_m2: number | null;
+  dyehouse: string | null;
+  dye_price: number | null;
   gramaj: number | null;
   order_quantity: number;
   quantity: number | null;
@@ -45,7 +61,11 @@ export interface SasForm {
   total_amount: number;
   plm_fetched_at: string | null;
   plm_error: string | null;
+  cost_opened_by: string | null;
+  cost_opened_at: string | null;
+  revision: number;
   created_at: string;
+  updated_at?: string;
 }
 
 export interface WorkOrder {
@@ -133,6 +153,22 @@ export async function openWorkOrder(orderId: string, leaderId: string, userId: s
 
   return workOrderId!;
 }
+
+/** Marks / unmarks the planning cost as opened. */
+export async function setCostOpened(sasId: string, userId: string, opened: boolean) {
+  const { error } = await supabase
+    .from("sas_forms")
+    .update(
+      opened
+        ? { cost_opened_by: userId, cost_opened_at: new Date().toISOString() }
+        : { cost_opened_by: null, cost_opened_at: null },
+    )
+    .eq("id", sasId);
+  if (error) throw error;
+}
+
+export const daysSince = (iso: string) =>
+  Math.max(0, Math.floor((Date.now() - new Date(iso).getTime()) / 86400000));
 
 export const formatTL = (n: number | null | undefined) =>
   new Intl.NumberFormat("tr-TR", { style: "currency", currency: "TRY" }).format(Number(n || 0));
