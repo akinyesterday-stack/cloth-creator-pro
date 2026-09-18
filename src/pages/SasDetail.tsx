@@ -207,7 +207,35 @@ const SasDetail = () => {
   const total = items.reduce((sum, i) => sum + Number(i.line_total || 0), 0);
   const gramajComplete = items.length > 0 && items.every((i) => Number(i.gramaj || 0) > 0);
   const fabricComplete =
-    items.length > 0 && items.every((i) => i.supplier && i.termin_date && Number(i.unit_price || 0) > 0);
+    items.length > 0 &&
+    items.every(
+      (i) =>
+        i.supplier &&
+        i.termin_date &&
+        Number(i.unit_price || 0) > 0 &&
+        Number(i.width_cm || 0) > 0 &&
+        Number(i.gsm_m2 || 0) > 0,
+    );
+
+  const toggleCostOpened = async () => {
+    if (!sas) return;
+    const opened = !sas.cost_opened_at;
+    try {
+      await setCostOpened(sas.id, user!.id, opened);
+      setSas({
+        ...sas,
+        cost_opened_at: opened ? new Date().toISOString() : null,
+        cost_opened_by: opened ? user!.id : null,
+      });
+      toast({ title: opened ? "Maliyet açıldı olarak işaretlendi" : "Maliyet işareti kaldırıldı" });
+    } catch (error) {
+      toast({
+        title: "İşaretlenemedi",
+        description: error instanceof Error ? error.message : "Bilinmeyen hata",
+        variant: "destructive",
+      });
+    }
+  };
 
   if (loading) {
     return (
@@ -301,12 +329,17 @@ const SasDetail = () => {
                       <TableHead>Kumaş Kodu</TableHead>
                       <TableHead>Kumaş Adı</TableHead>
                       <TableHead>Renk</TableHead>
-                      <TableHead className="w-28">Gramaj (gr)</TableHead>
+                      <TableHead className="w-40">Cins / Kompozisyon</TableHead>
+                      <TableHead className="w-24">En (cm)</TableHead>
+                      <TableHead className="w-28">m² Gramaj</TableHead>
+                      <TableHead className="w-36">Boyahane</TableHead>
+                      <TableHead className="w-28">Pastal Gr.</TableHead>
                       <TableHead className="w-24">Adet</TableHead>
                       <TableHead className="w-28">Miktar (kg)</TableHead>
                       <TableHead className="w-40">Üretici</TableHead>
                       <TableHead className="w-40">Termin</TableHead>
-                      <TableHead className="w-28">Birim Fiyat</TableHead>
+                      <TableHead className="w-28">Kumaş Fiyatı</TableHead>
+                      <TableHead className="w-28">Boya Fiyatı</TableHead>
                       <TableHead className="w-32">Tutar</TableHead>
                       {canPlm && <TableHead className="w-10" />}
                     </TableRow>
@@ -337,6 +370,44 @@ const SasDetail = () => {
                           )}
                         </TableCell>
                         <TableCell className="text-sm">{item.color || "—"}</TableCell>
+                        <TableCell>
+                          <Input
+                            className="h-8"
+                            disabled={!canFabric}
+                            defaultValue={item.composition || ""}
+                            onBlur={(e) => updateItem(item.id, { composition: e.target.value || null })}
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <Input
+                            type="number"
+                            className="h-8"
+                            disabled={!canFabric}
+                            defaultValue={item.width_cm ?? ""}
+                            onBlur={(e) =>
+                              updateItem(item.id, { width_cm: e.target.value ? Number(e.target.value) : null })
+                            }
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <Input
+                            type="number"
+                            className="h-8"
+                            disabled={!canFabric}
+                            defaultValue={item.gsm_m2 ?? ""}
+                            onBlur={(e) =>
+                              updateItem(item.id, { gsm_m2: e.target.value ? Number(e.target.value) : null })
+                            }
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <Input
+                            className="h-8"
+                            disabled={!canFabric}
+                            defaultValue={item.dyehouse || ""}
+                            onBlur={(e) => updateItem(item.id, { dyehouse: e.target.value || null })}
+                          />
+                        </TableCell>
                         <TableCell>
                           <Input
                             type="number"
@@ -389,6 +460,18 @@ const SasDetail = () => {
                             }
                           />
                         </TableCell>
+                        <TableCell>
+                          <Input
+                            type="number"
+                            step="0.01"
+                            className="h-8"
+                            disabled={!canFabric}
+                            defaultValue={item.dye_price ?? ""}
+                            onBlur={(e) =>
+                              updateItem(item.id, { dye_price: e.target.value ? Number(e.target.value) : null })
+                            }
+                          />
+                        </TableCell>
                         <TableCell className="text-sm font-semibold">{formatTL(item.line_total)}</TableCell>
                         {canPlm && (
                           <TableCell>
@@ -426,18 +509,18 @@ const SasDetail = () => {
             />
             <div className="flex flex-wrap gap-2">
               {status === "draft" && canPlm && (
-                <Button onClick={() => setStatus("gramaj_pending")} disabled={items.length === 0 || busy}>
-                  Kesim Takibe Gönder
+                <Button onClick={() => setStatus("fabric_pending")} disabled={items.length === 0 || busy}>
+                  Kumaş Sorumlusuna Gönder
+                </Button>
+              )}
+              {(status === "fabric_pending" || status === "rejected") && canFabric && (
+                <Button onClick={() => setStatus("gramaj_pending")} disabled={!fabricComplete || busy}>
+                  <Send className="h-4 w-4 mr-1" /> Kesim Takibe Gönder
                 </Button>
               )}
               {status === "gramaj_pending" && canGramaj && (
-                <Button onClick={() => setStatus("fabric_pending")} disabled={!gramajComplete || busy}>
-                  Gramajları Tamamla
-                </Button>
-              )}
-              {status === "fabric_pending" && canFabric && (
-                <Button onClick={() => setStatus("sorumlu_approval")} disabled={!fabricComplete || busy}>
-                  <Send className="h-4 w-4 mr-1" /> Onaya Gönder
+                <Button onClick={() => setStatus("sorumlu_approval")} disabled={!gramajComplete || busy}>
+                  <Send className="h-4 w-4 mr-1" /> Tedarik Sorumlusuna Gönder
                 </Button>
               )}
               {status === "sorumlu_approval" && canSorumluApprove && (
